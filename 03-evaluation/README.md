@@ -264,9 +264,9 @@ the one from the top of this page, because only you know what your rooms
 cost.
 
 [`evaluators/room_rate_accuracy.py`](evaluators/room_rate_accuracy.py) is
-a trace-level **code** evaluator that pulls every money figure out of the
-answer and checks it against the published price list, allowing for
-nightly multiples of a stay length the guest actually asked about.
+a trace-level **code** evaluator that pulls every rate the answer quotes
+and checks it against the published rate card, allowing for nightly
+multiples of a stay length the guest actually asked about.
 
 Custom evaluators are written in the console: **Resources → Evaluators →
 Create Evaluator**, the same library you read the built-ins in.
@@ -312,40 +312,43 @@ save.
 
 ### What to put in the config
 
-The evaluator needs the hotel's real prices, and you set them when you add
+The evaluator needs the hotel's real rates, and you set them when you add
 it to a monitor - `valid_amounts` as an array, `max_nights` as an integer:
 
 | Parameter | Value |
 |---|---|
-| `valid_amounts` | `18, 22, 32, 36, 48, 62, 280, 340, 380, 420, 1200` |
+| `valid_amounts` | `280, 340, 380, 420, 1200` |
 | `max_nights` | `30` |
 
-Those eleven numbers are every published price the agent can legitimately
-quote, and they come straight out of `agent/hotel_data.py` - the five
-room rates in `ROOMS` (`price_per_night_usd`) and the six menu prices in
-`MENU` (`price_usd`). From the repo root:
+That is the rate card: the five nightly rates in `agent/hotel_data.py`,
+under `ROOMS` as `price_per_night_usd`. From the repo root:
 
 ```bash
 python3 -c "
-from agent.hotel_data import ROOMS, MENU
-print(sorted({r['price_per_night_usd'] for r in ROOMS.values()} | {m['price_usd'] for m in MENU}))
+from agent.hotel_data import ROOMS
+print(sorted(r['price_per_night_usd'] for r in ROOMS.values()))
 "
-# → [18, 22, 32, 36, 48, 62, 280, 340, 380, 420, 1200]
+# → [280, 340, 380, 420, 1200]
 ```
 
-**Include the menu prices, not just the room rates.** The evaluator reads
-*every* money figure in the answer, and the agent quotes a $36 risotto as
-readily as a $380 suite. Give it the room rates alone and every room
-service answer scores zero - not because the agent said anything wrong,
-but because you handed the evaluator half the price list. The config *is*
-the contract: a custom evaluator only knows what your organisation counts
-as correct if you tell it all of it.
+**Nothing else belongs in that list**, and the evaluator is written to
+match: it only considers figures the answer presents as a rate or a stay
+total - *"$340 per night"*, *"$1,140 for three nights"*, *"the total is
+$1,140"*. The $36 risotto on the room service menu is a real price and a
+different evaluator's problem. An evaluator that scored every number in
+every answer would need the menu, the spa list and the parking tariff
+before it could say anything, and it would report a failure the first time
+the hotel added a dessert.
+
+The config *is* the contract, then, and the contract is deliberately
+narrow: this evaluator answers one question - *are the rates we quote our
+rates?* - and declines to judge the rest, honestly, with a skip.
 
 Which is also why the list is configuration rather than a literal in the
 evaluator's body. In a real deployment you would populate it from
-wherever prices actually live - the same export the agent reads, a pricing
+wherever rates actually live - the same export the agent reads, a pricing
 API, a nightly job - so that the check moves when the prices do. A second
-hand-maintained copy of the price list would drift exactly the way the
+hand-maintained copy of the rate card would drift exactly the way the
 tool description in module 02 drifted.
 
 ### Try it on traffic you already have
@@ -386,8 +389,9 @@ Run the evaluator you just wrote over enough traffic and it will let
 something through that it should not. Here is the shape of it: *"$420 per
 night, or $760 for two nights."* Wrong for a $420 room - two nights is
 $840 - but $760 is exactly two nights of the $380 junior suite, so a rule
-holding a price list and a night count cannot fault it. Every figure is on
-the list, and the total is a legitimate multiple of one of them.
+holding a rate card and a night count cannot fault it. Both figures are
+rates, both are on the card, and the total is a legitimate multiple of one
+of them.
 
 No amount of regex fixes that. It needs something that can read which
 room was being discussed - which is what a judge does, and why two of them
