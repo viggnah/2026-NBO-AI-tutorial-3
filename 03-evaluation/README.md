@@ -293,16 +293,12 @@ def my_evaluator(
 ) -> EvalResult:
 ```
 
-Four things follow from that, and each one is a way to lose ten minutes:
+Three things follow from that:
 
 - **Declare the config params before you paste.** Add `valid_amounts`
-  (array) and `max_nights` (integer, default `30`) in the **Config
-  Params** section and those two lines appear in the header, typed. Paste
-  first and the names in your body are undefined.
-- **Give every config param a default.** A parameter marked *Required*
-  with no default stops the evaluator registering at all, and the run
-  fails with `missing required parameter(s)` even though the monitor
-  supplied a value. Set `[]` and `30` and it runs.
+  (array, default `[]`) and `max_nights` (integer, default `30`) in the
+  **Config Params** section and those two lines appear in the header,
+  typed. Paste first and the names in your body are undefined.
 - **Use the parameters by their own names** - `valid_amounts`, not
   `self.valid_amounts`. They are function arguments. (The built-ins you
   read in step 3 are methods on a class, which is why their source says

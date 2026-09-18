@@ -14,8 +14,7 @@
 # the typed first parameter that sets the evaluation level, and one line
 # per config parameter you declare in the Config Params section beneath it.
 # You write the body. Declare these two parameters first, in the Config
-# Params section - each with a default, because a parameter marked
-# Required with no default stops the evaluator registering at all:
+# Params section, each with a default:
 #
 #   Key            Type     Default
 #   valid_amounts  array    []        the published prices
