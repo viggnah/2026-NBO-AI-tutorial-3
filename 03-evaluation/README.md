@@ -307,8 +307,48 @@ Three things follow from that:
 Paste the block between the markers over the editor's example body, and
 save.
 
-Then try it on traffic you already have. A **Past Traces** monitor
-containing only this evaluator scores the whole window in seconds - rules
+### What to put in the config
+
+The evaluator needs the hotel's real prices, and you set them when you add
+it to a monitor - `valid_amounts` as an array, `max_nights` as an integer:
+
+| Parameter | Value |
+|---|---|
+| `valid_amounts` | `18, 22, 32, 36, 48, 62, 280, 340, 380, 420, 1200` |
+| `max_nights` | `30` |
+
+Those eleven numbers are every published price the agent can legitimately
+quote, and they come straight out of `agent/hotel_data.py` - the five
+room rates in `ROOMS` (`price_per_night_usd`) and the six menu prices in
+`MENU` (`price_usd`). From the repo root:
+
+```bash
+python3 -c "
+from agent.hotel_data import ROOMS, MENU
+print(sorted({r['price_per_night_usd'] for r in ROOMS.values()} | {m['price_usd'] for m in MENU}))
+"
+# → [18, 22, 32, 36, 48, 62, 280, 340, 380, 420, 1200]
+```
+
+**Include the menu prices, not just the room rates.** The evaluator reads
+*every* money figure in the answer, and the agent quotes a $36 risotto as
+readily as a $380 suite. Give it the room rates alone and every room
+service answer scores zero - not because the agent said anything wrong,
+but because you handed the evaluator half the price list. The config *is*
+the contract: a custom evaluator only knows what your organisation counts
+as correct if you tell it all of it.
+
+Which is also why the list is configuration rather than a literal in the
+evaluator's body. In a real deployment you would populate it from
+wherever prices actually live - the same export the agent reads, a pricing
+API, a nightly job - so that the check moves when the prices do. A second
+hand-maintained copy of the price list would drift exactly the way the
+tool description in module 02 drifted.
+
+### Try it on traffic you already have
+
+A **Past Traces** monitor containing only this evaluator
+scores the whole window in seconds - rules
 are free and instant, so there is no reason to guess whether it works.
 Read the explanations, adjust, save, run it again: the window does not
 move, so two runs over the same traces are directly comparable. That is

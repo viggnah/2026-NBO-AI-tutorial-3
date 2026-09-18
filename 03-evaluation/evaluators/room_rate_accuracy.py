@@ -20,6 +20,14 @@
 #   valid_amounts  array    []        the published prices
 #   max_nights     integer  30        largest multiple to accept as a total
 #
+# and you set their values when you add the evaluator to a monitor. For
+# this hotel that is every price in agent/hotel_data.py - the five room
+# rates and the six menu prices, because the agent quotes both and this
+# evaluator reads every money figure in the answer:
+#
+#   valid_amounts  18, 22, 32, 36, 48, 62, 280, 340, 380, 420, 1200
+#   max_nights     30
+#
 # and the editor's fixed header becomes exactly this:
 #
 #   from amp_evaluation import EvalResult, Param
