@@ -272,6 +272,11 @@ I apologize for the inconvenience. It seems I can't retrieve dining
 recommendations right now.
 ```
 
+> Clicking is fine here too: ask the same question three times in the
+> console's **Try It** tab instead. The apologies come back the same way,
+> and each attempt lands in **Traces** identically — the loop above just
+> saves you typing it three times.
+
 Three for three. The concierge cannot name a restaurant — and
 `agent/hotel_data.py` has three of them, a four-minute walk away.
 
@@ -279,6 +284,11 @@ Everything a normal service would tell you says this is fine. `200 OK`
 every time. No exception, no stack trace, nothing in the runtime logs. The
 replies are well-formed, polite and on-brand; if you only read those, the
 obvious conclusion is that nobody loaded the restaurant data.
+
+The trace list will not save you either. These requests are **16 spans**,
+which is exactly what a healthy one is — same shape, same span count,
+unremarkable duration. Nothing about the outside of this request is
+unusual, which is the whole reason it is still in production.
 
 Open one of the traces and look at its single tool span:
 
@@ -320,23 +330,25 @@ amctl agent deploy grand-meridian-concierge \
 ```
 
 Now the refusal names the categories that do exist. Ask again and the
-guest gets a real answer — the model reads the error, works out the
-category it should have asked for, and retries. But look at the trace
+guest usually gets a real answer — the model reads the error, works out
+the category it should have asked for, and retries. *Usually*: in one run
+of three it still gave up. But when it does recover, look at the trace
 list:
 
 ```
-4a1fdae1  24 spans
-9178f9b9  24 spans
-b95e6661  24 spans
+4735e3e0  24 spans     <- recovered
+0da7337f  24 spans     <- recovered
+09167c16  16 spans     <- gave up anyway
 ```
 
-Twenty-four spans, where a clean request is sixteen. Eight of them are a
-round trip the agent should never have needed, and it pays that on every
-food question, forever, silently. Step 5's `--condition excessive_steps`
-is built to find exactly this shape.
+Twenty-four spans, where both the healthy request and the failing one are
+sixteen. Those eight extra spans are a round trip the agent should never
+have needed, and it pays them on every food question, forever, silently.
+Step 5's `--condition excessive_steps` is built to find exactly this
+shape.
 
-So a good error message bought **resilience, not correctness**. The wrong
-argument is still being sent. That is worth knowing about your own tools:
+So a good error message bought **resilience, not correctness** — and not
+even reliably. The wrong argument is still being sent. That is worth knowing about your own tools:
 what they say when they refuse is part of the same interface as what they
 accept, and it decides whether a small drift degrades or fails outright.
 
@@ -369,13 +381,15 @@ Ask once more:
 | **Output** | `{"category": "restaurants", "recommendations": [...], "count": 3}` |
 
 ```
-93c0af9c  16 spans
-7c7e4845  16 spans
-17f9103e  16 spans
+364ac010  16 spans
+290dce12  16 spans
 ```
 
 One call, the right call, three for three — and eight spans lighter than
-the version that recovered.
+the version that recovered. Note what the span counts do *not* tell you:
+the broken agent and the fixed one are both sixteen. Only the tool span's
+arguments separate them, which is the one place a response body, a status
+code and a span count all decline to look.
 
 > **The fix is not the word, it is the second row of that table.** A tool
 > description is an interface that a model reads and no compiler checks:

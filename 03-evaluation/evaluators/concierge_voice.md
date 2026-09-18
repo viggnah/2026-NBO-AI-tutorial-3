@@ -1,9 +1,16 @@
 # Concierge Voice — a custom LLM-judge evaluator, trace level
 
-Paste the block below into the console's prompt editor when creating an
-LLM-Judge evaluator. Write only the criteria — the platform wraps your
-prompt in the scoring instructions that make the model return a
-structured score and explanation.
+An LLM-judge evaluator is a prompt, not code. You write the criteria and
+the rubric; the platform appends the instructions that make the model
+return a structured score and explanation — so do not write output-format
+instructions yourself.
+
+Access trace data with `{expression}`, Python f-string style. Expressions
+are allowed (`{len(trace.spans)}`, comprehensions); statements are not.
+The prompt below uses the three fields a trace-level judge almost always
+wants — `trace.input`, `trace.output`, and `trace.format_evidence()`,
+which renders the tool results and retrieved documents the agent actually
+had in front of it.
 
 ## Why a judge and not a rule
 
@@ -25,73 +32,61 @@ what you would otherwise have to read.
 ## The prompt
 
 ```text
-You are reviewing a single interaction from the AI concierge at The Grand
-Meridian, a luxury hotel. Judge only how well the response follows the
-hotel's service standards. Do not judge the guest.
+You are an expert evaluator. Your sole criterion is CONCIERGE STANDARD: does this response meet the service standards of The Grand Meridian, a luxury hotel? Judge the concierge, never the guest.
 
-Guest said:
-{trace.input}
+Guest Query: {trace.input}
+Concierge Response: {trace.output}
 
-Concierge replied:
-{trace.output}
+Evidence Available to the Concierge:
+{trace.format_evidence()}
 
-Tools the concierge used, with their arguments and results:
-{trace.get_tool_steps()}
+Evaluation Steps:
+1. GROUNDED. Check every price, room name, room size, menu item and recommendation in the response against the evidence above. A figure that is a stated nightly rate multiplied by a stay length the guest asked about is correct; a figure attributable to a different room than the one under discussion is not, however plausible the arithmetic looks.
+2. ANSWER FIRST. Check that the response opens with what the guest asked for, rather than with pleasantries, an apology, or a restatement of the question.
+3. IN CHARACTER. Warm, concise, slightly formal — a concierge, not a chatbot and not a brochure. At most one follow-up offer, and only where it genuinely serves the guest.
+4. NO LEAKED PLUMBING. No error text, tool names, JSON, stack traces or internal identifiers. Where a tool failed, the response apologises briefly and offers the nearest alternative without narrating the machinery.
+5. HONEST LIMITS. Where the evidence does not cover the request, the response says so and offers a handover, rather than filling the gap with something invented or generic.
 
-Score against these five standards, weighted equally:
+Weigh grounding above the other four: a beautifully written answer carrying a rate the hotel does not charge is worse than a plain one.
 
-1. GROUNDED IN TOOL DATA. Every price, room name, room size, menu item and
-   recommendation in the reply appears in the tool results above. Prices
-   that are a stated nightly rate multiplied by a stay length the guest
-   asked about are correct; any other figure is not. If the reply quotes a
-   figure attributable to a different room than the one discussed, that is
-   a failure of this standard, however plausible the arithmetic looks.
-
-2. ANSWER FIRST. The reply opens with what the guest asked for, not with
-   pleasantries, apologies or restatement of the question.
-
-3. IN CHARACTER. Warm, concise, slightly formal. A concierge, not a
-   chatbot and not a brochure. At most one follow-up offer, and only where
-   it genuinely serves the guest.
-
-4. NO LEAKED PLUMBING. No error messages, tool names, JSON, stack traces
-   or internal identifiers. If a tool failed, the reply apologises briefly
-   and offers the nearest alternative without explaining why.
-
-5. HONEST LIMITS. Where the tool data does not cover the request, the
-   reply says so and offers a handover, rather than filling the gap with
-   something invented or generic.
-
-Score 1.0 when all five standards are met. Deduct for each standard
-missed, in proportion to how much it would embarrass the hotel if a guest
-saw it. Score 0.0 when the reply states something the tool data
-contradicts.
-
-In your explanation, name the standards that were missed and quote the
-exact words that missed them.
+Scoring Rubric:
+  0.0  = States something the evidence contradicts — an invented rate, room type or amenity
+  0.25 = Grounded, but badly off standard: leaked plumbing, or the answer buried under pleasantries
+  0.5  = Accurate and usable, with two or more standards clearly missed
+  0.75 = Meets the standards with one minor lapse
+  1.0  = All five standards met — grounded, answer-first, in character, clean, and honest about its limits
 ```
 
 ## Configuration
 
-When you add this evaluator to a monitor you set the same three
-parameters every LLM-as-Judge evaluator takes:
+Pick **LLM-Judge** as the type and **trace** as the level, and the Config
+Params section arrives with the four parameters every judge takes already
+in it. Only the first has no default:
 
-| Parameter | Suggested | Why |
+| Parameter | Set to | Why |
 |---|---|---|
-| **Model** | `openai/gpt-4o` | Standard 1 requires arithmetic and cross-referencing against tool output. A smaller judge model scores tone well and grounding poorly. |
-| **Temperature** | `0.0` | You want the same trace to score the same way twice. |
-| **Criteria** | leave default | The prompt above already carries the criteria. |
+| `model` | `gpt-4o` | Required, and **bare** — the provider already names the vendor and the platform prefixes its template, so `openai/gpt-4o` is sent as `openai/openai/gpt-4o` and rejected as an invalid model ID. Step 1 needs arithmetic and cross-referencing against tool output; a smaller judge scores tone well and grounding poorly. |
+| `temperature` | `0` (the default) | You want the same trace to score the same way twice. |
+| `max_tokens` | `1024` (the default) | Enough for a score and a two-sentence explanation. |
+| `max_retries` | `2` (the default) | Retries when the model returns something unparseable. |
+
+The *provider* those calls go through is not set here — you choose it once
+per monitor, and every judge in that monitor shares it.
+
+If the judge reports *skipped* on every trace, read the run's **Logs**
+tab before touching the prompt: the skip reason carries the model's own
+error, and the usual answer is the model name.
 
 ## Making it reusable
 
-Add a config parameter and this evaluator stops being about one hotel.
-In the **Config Params** section, add:
+Add your own config parameter and this evaluator stops being about one
+hotel. In **Config Params**, add:
 
 | Key | Type | Default |
 |---|---|---|
 | `property_name` | string | `The Grand Meridian` |
 
-Then replace the first line's hotel name with `{property_name}`. The same
-evaluator now serves every property in the group, configured per monitor
-— which is the same reuse-with-a-contract idea as an Agent Kind, applied
-to quality standards instead of to agents.
+Then replace the hotel's name in the first line with `{property_name}`.
+The same evaluator now serves every property in the group, configured per
+monitor — the same reuse-with-a-contract idea as an Agent Kind, applied to
+quality standards instead of to agents.

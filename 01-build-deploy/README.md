@@ -141,6 +141,28 @@ curl -s -X POST "$AGENT_URL/chat" \
 The same agent you ran locally in module 00, now behind a gateway
 that will not talk to a stranger.
 
+### The same call, without the plumbing
+
+You do not have to leave the console to do that. **Try It** is in the
+agent's left nav: open it, type into **Type your message...**, press
+**Send**.
+
+It handles everything the curl above spells out — it mints and holds its
+own test API key, sets the header, and knows the endpoint, so there is no
+key to create and nothing to paste. Two things to know before you read
+anything into an answer: it talks to the **environment selected at the top
+of the page**, and it needs the agent to be deployed (it says so plainly
+if it is not). Responses stream, and **Stop** interrupts one mid-flight.
+
+Use whichever suits the moment. The console wins for *is it alive, and does
+it sound like a concierge* — it is two clicks and no shell. The curl is
+what you keep: it goes into a script, a CI job, or a bug report, which is
+why the rest of this lab uses it. [Module 02](../02-observability/README.md)
+sends this same request a hundred times, and nobody wants to click that.
+
+Either way the call goes through the same gateway to the same endpoint, so
+either way it turns up in the traces you will read in module 02.
+
 ## Step 5 — The same thing, in one command
 
 The console is for the first time. This is for every time after:

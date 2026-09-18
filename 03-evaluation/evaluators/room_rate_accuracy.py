@@ -9,15 +9,43 @@
 # most — a confident, well-written, fast, cheap answer quoting a rate the
 # hotel does not charge.
 #
-# Config parameters (set when you add the evaluator to a monitor):
-#   valid_amounts  array   the published prices, e.g. [280, 340, 380, 420, 1200]
-#   max_nights     integer largest multiple to accept as a total (default 30)
+# HOW THE CONSOLE EDITOR WORKS. You do not write the whole file. The top of
+# the editor is generated and read-only — the imports, the function name,
+# the typed first parameter that sets the evaluation level, and one line
+# per config parameter you declare in the Config Params section beneath it.
+# You write the body. Declare these two parameters first, in the Config
+# Params section — each with a default, because a parameter marked
+# Required with no default stops the evaluator registering at all:
 #
-# Everything between the two markers is what you paste into the console's
-# code editor. The console supplies the imports and the signature header.
+#   Key            Type     Default
+#   valid_amounts  array    []        the published prices
+#   max_nights     integer  30        largest multiple to accept as a total
+#
+# and the editor's fixed header becomes exactly this:
+#
+#   from amp_evaluation import EvalResult, Param
+#   from amp_evaluation.trace.models import Trace
+#
+#
+#   def my_evaluator(
+#       trace: Trace,
+#       # Configurable parameters — defined in the Config Params section below.
+#       valid_amounts: list = Param(default=[], description="Published nightly prices"),
+#       max_nights: int = Param(default=30, description="Largest multiple to accept as a total"),
+#   ) -> EvalResult:
+#
+# So `trace`, `valid_amounts` and `max_nights` are already in scope, under
+# those names — they are function arguments, not attributes, so it is
+# `valid_amounts` and never `self.valid_amounts`. The function is always
+# called `my_evaluator`, and anything you need to import is imported inside
+# the body, since the header is not yours to edit — which is why
+# `import re` is the first line below.
+#
+# Everything between the two markers is the body. Select the editor's
+# existing body and paste over it.
 
 # --- paste from here -------------------------------------------------
-def evaluate(trace: Trace, valid_amounts: list = None, max_nights: int = 30) -> EvalResult:
+    """Every money figure in the reply is a published price, or a multiple of one."""
     import re
 
     if not trace.output:
@@ -69,20 +97,23 @@ def evaluate(trace: Trace, valid_amounts: list = None, max_nights: int = 30) -> 
     for amount in amounts:
         (ok if amount in grounded else unaccounted).append(amount)
 
-    score = len(ok) / len(amounts)
     one = len(amounts) == 1
     noun, verb = ("figure", "matches") if one else ("figures", "match")
 
     if not unaccounted:
         return EvalResult(
             score=1.0,
+            passed=True,
             explanation=f"All {len(amounts)} money {noun} {verb} the published "
                         f"price list, or a nightly multiple of it.",
         )
 
     shown = ", ".join(f"${a:,.0f}" for a in sorted(set(unaccounted))[:5])
     return EvalResult(
-        score=score,
+        score=len(ok) / len(amounts),
+        # One rate the hotel does not charge is a failed check, whatever the
+        # other figures did — so do not let the proportion decide pass/fail.
+        passed=False,
         explanation=f"{len(unaccounted)} of {len(amounts)} money {noun} not "
                     f"on the price list, and not a multiple of it for any "
                     f"stay length mentioned: {shown}. Published prices: "

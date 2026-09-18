@@ -14,6 +14,14 @@
 # script, not a rule about where judges belong — add judges and their
 # provider configuration whenever you want them, in either monitor type.
 #
+# To add one, put the provider alongside the evaluators in the body:
+#
+#   llmProvider: { providerName: "<your llm provider>" },
+#   evaluators: [ ..., pick("Completeness"; { model: "gpt-4o", temperature: 0 }) ]
+#
+# The model name goes in bare. The provider already says which vendor it
+# is, and the runner prefixes the template itself.
+#
 # Usage:
 #   ./create-monitor.sh [agent-name] [hours-back]
 #

@@ -25,6 +25,9 @@ curl -s -X POST "$AGENT_URL/chat" -H "X-API-Key: $AGENT_KEY" \
   -d '{"message":"What can you tell me about the deluxe suite?","session_id":"a","context":{}}' | jq -r .response
 ```
 
+Or send it twice from the console's **Try It** tab, which needs no key
+and no endpoint — the point lands the same way, and faster.
+
 Two runs produce two different sentences. Both may be correct. Neither is
 equal to the other, and equality is what an assertion is made of.
 
@@ -71,14 +74,32 @@ agent, an environment, and a window of traces to run over.
    |---|---|---|
    | **Length Compliance** | trace | `min_length` 20, `max_length` 2000 |
    | **Latency Performance** | trace | `max_latency_ms` 5000 |
-   | **Content Safety** | trace | `prohibited_strings`: `guarantee`, `refund`, `free upgrade` · `prohibited_patterns`: a card-number and an email pattern |
+   | **Content Safety** | trace | `prohibited_strings`: `guarantee`, `refund`, `free upgrade` · `prohibited_patterns`: the two below |
+
+   `prohibited_patterns` takes a list of regular expressions. Add these
+   two — a bare 13-to-16-digit run, and an email address:
+
+   ```text
+   \b\d{13,16}\b
+   \b[\w.+-]+@[\w-]+\.[\w.]+\b
+   ```
+
+   Paste them exactly as written: the console field takes raw regex, while
+   `create-monitor.sh` carries the same two patterns JSON-escaped (`\\b`)
+   because they travel inside a request body.
+
+   Both are things a reply should never contain, and neither one fires on
+   what a concierge answer legitimately says — `450 USD`, `GM-2026-0918`
+   and `confirmation 12345` all pass. The digit pattern is strict about
+   separators, so `4111 1111 1111 1111` written with spaces slips past it;
+   widen it if your traffic looks like that.
 
    **LLM-as-judge** — a model reads the trace and scores it:
 
    | Evaluator | Level | Set |
    |---|---|---|
-   | **Completeness** | trace | `model` `openai/gpt-4o` · `temperature` `0.0` |
-   | **Tone** | llm | `model` `openai/gpt-4o` · `temperature` `0.0` · `context` `luxury hotel concierge` |
+   | **Completeness** | trace | `model` `gpt-4o` · `temperature` `0.0` |
+   | **Tone** | llm | `model` `gpt-4o` · `temperature` `0.0` · `context` `luxury hotel concierge` |
 
 6. The judges need a model, so a **LLM Providers** section appears in the
    evaluator configuration panel. Pick a provider, paste an API key, and
@@ -121,6 +142,15 @@ complete answer looks like for your agent.
 > `model` is the one setting with no default: judges will not run without
 > it. Keep `temperature` at `0.0` — you want the same trace to score the
 > same way twice.
+>
+> **Give the model name bare — `gpt-4o`, not `openai/gpt-4o`.** The
+> provider you picked already says which vendor this is, and the platform
+> prefixes its template handle for you. Spell the vendor out yourself and
+> the call goes out as `openai/openai/gpt-4o`, which the gateway rejects
+> as an invalid model ID. The judge then reports *skipped* on every trace
+> — and a run where everything skipped still finishes green, with `N/A`
+> where the score should be. That is the single most likely reason a
+> monitor looks like it worked and scored nothing.
 
 Give it a few minutes. The rule-based evaluators finish almost instantly;
 the judges make a model call per evaluation, and `Tone` makes one per
@@ -171,16 +201,53 @@ between them is not cosmetic.
 | Same trace twice | Identical score | Near-identical |
 | Right for | latency, length, token budget, required tools, prohibited content | accuracy, helpfulness, groundedness, tone, reasoning |
 
-Read the source of a built-in rule to see how little magic is involved —
-every built-in ships its implementation:
+### Read the code
 
-```bash
-amctl api --project default '/orgs/{org}/evaluators' -X GET -f limit=100 \
-  | jq -r '.evaluators[] | select(.displayName=="Content Safety") | .source'
+There is less magic here than the word "evaluator" suggests, and you can
+check that yourself: every built-in ships its implementation, and the
+console will show it to you.
+
+Step out of the agent to the organization level in the left nav and open
+**Resources → Evaluators**. That is the library of every evaluator on the
+instance, each tagged **Built-in** or **Custom**. Click **Content Safety**.
+
+The **Source Code** panel holds the Python that actually scored your
+traces, read-only. It is about thirty lines, and one of them is step 1's
+warning, written into the evaluator rather than inferred by the platform:
+
+```python
+if not all_prohibited and not self.prohibited_patterns:
+    return EvalResult.skip("No prohibited content configured. Add at least one prohibited string or pattern.")
 ```
 
-And list what your instance offers, with levels and types. **Pass a
-`limit`** — the endpoint pages at 20 and there are more than that:
+A few lines further down is what your two patterns are handed to —
+`re.search(pattern, output, flags)`, with `re.IGNORECASE` unless you set
+`case_sensitive`. So they are ordinary Python regular expressions, and they
+are matched against `trace.output`: this evaluator scores what the agent
+*said*, not what the guest asked.
+
+Now open **Tone**. Same page, except the panel is headed **Prompt
+Template** — because a judge's implementation *is* its prompt, and all of
+it is there: the criterion, the evaluation steps, the template variables
+that decide what the judge sees (`{llm_span.format_messages()}`), and the
+rubric it scores against.
+
+```text
+  0.0  = Clearly inappropriate tone (rude, condescending, dismissive, or wildly mismatched to context)
+  ...
+  0.75 = Good tone that is professional, helpful, and well-suited to context
+  1.0  = Excellent tone; perfectly calibrated, professional, warm, and clearly helpful
+```
+
+That is worth thirty seconds of reading, because it changes what a judge
+score means. A `0.75` from `Tone` is not a model's vague opinion — it is a
+rung on a rubric you can read, against a prompt you can audit. And when a
+judge scores something you disagree with, this is the page that tells you
+why.
+
+The same data is on the CLI, if you would rather script it than click. List
+what your instance offers, with levels and types — and **pass a `limit`**,
+because the endpoint pages at 20 and there are more than that:
 
 ```bash
 amctl api --project default '/orgs/{org}/evaluators' -X GET -f limit=100 \
@@ -235,23 +302,67 @@ cd evaluators
 ```
 
 ```
-real · one room                            100%   All 1 money figure matches ...
-real · a 3-night total                     100%   All 2 money figures match ...
-real · no prices at all                    SKIP   No money figures in the response
-caught · a rate we do not charge             0%   1 of 1 money figure not on the price list ...
-missed · plausible arithmetic, wrong room  100%   All 2 money figures match ...
+real · one room                            100% pass  All 1 money figure matches ...
+real · a 3-night total                     100% pass  All 2 money figures match ...
+real · no prices at all                   SKIP    —    No money figures in the response
+caught · a rate we do not charge             0% FAIL  1 of 1 money figure not on the price list ...
+missed · plausible arithmetic, wrong room  100% pass  All 2 money figures match ...
 ```
 
-[`harness.py`](evaluators/harness.py) defines the same `Trace` and
-`EvalResult` objects the platform injects, runs your function against
-sample traces, and prints the scores. A second to run, instead of a
-save-and-wait-for-a-run cycle.
+[`harness.py`](evaluators/harness.py) stands in the same `Trace` and
+`EvalResult` the platform injects, wraps your body in the same header the
+console generates, runs it against sample traces and prints the scores. A
+second to run, instead of a save-and-wait-for-a-run cycle.
 
-Then paste the block between the markers into the console editor. The
-platform supplies the imports and the signature; you write the body.
-Declare `valid_amounts` and `max_nights` as **config params** and the
-same evaluator serves every property in the group, configured per
-monitor.
+### What the editor actually gives you
+
+You do not write the whole file. The top of the editor is generated and
+read-only:
+
+```python
+from amp_evaluation import EvalResult, Param
+from amp_evaluation.trace.models import Trace
+
+
+def my_evaluator(
+    trace: Trace,
+    # Configurable parameters — defined in the Config Params section below.
+    valid_amounts: list = Param(default=[], description="Published nightly prices"),
+    max_nights: int = Param(default=30, description="Largest multiple to accept as a total"),
+) -> EvalResult:
+```
+
+Four things follow from that, and each one is a way to lose ten minutes:
+
+- **Declare the config params before you paste.** Add `valid_amounts`
+  (array) and `max_nights` (integer, default `30`) in the **Config
+  Params** section and those two lines appear in the header, typed. Paste
+  first and the names in your body are undefined.
+- **Give every config param a default.** A parameter marked *Required*
+  with no default stops the evaluator registering at all, and the run
+  fails with `missing required parameter(s)` even though the monitor
+  supplied a value. Set `[]` and `30` and it runs.
+- **Use the parameters by their own names** — `valid_amounts`, not
+  `self.valid_amounts`. They are function arguments. (The built-ins you
+  read in step 3 are methods on a class, which is why their source says
+  `self.`; yours is not.)
+- **Imports go inside the body.** You cannot add a top-level import to a
+  header you cannot edit, which is why `import re` is the first line of
+  the body. `numpy`, `pandas`, `requests` and `any-llm-sdk` are available
+  alongside the standard library.
+
+Paste the block between the markers over the editor's example body, and
+save.
+
+> Two conveniences worth knowing. The editor **underlines fields that do
+> not exist** on the type you are working with — `trace.answer` gets a
+> squiggle reading *Unknown field 'answer' on trace* — so a typo surfaces
+> before a run rather than during one. And the **AI Copilot Prompt** button
+> hands you a ready-made prompt for whatever assistant you use, already
+> pointing at the framework reference the platform serves at
+> `/prompts/writing-evaluators.md`. That reference is the authority on
+> every field and method available at each level; read it before inventing
+> a helper that does not exist.
 
 > **`EvalResult.skip()` is not a zero.** Use it when the evaluator does
 > not apply — no output, no prices, no retrieval step. Skips are tracked
@@ -292,9 +403,15 @@ expressible as a rule, and all five are things a hotel would actually
 fire someone over.
 
 Add it in the console the same way, choosing **LLM-Judge** as the type
-and pasting the prompt. It takes the same **Model**, **Temperature** and
-**Criteria** settings as the built-in judges, and shares the monitor's LLM
-credentials — nothing extra to configure.
+and pasting the prompt. Pick the type and the Config Params section
+arrives with the four parameters every judge takes already in it — `model`
+(required, and bare: `gpt-4o`), `temperature`, `max_tokens`,
+`max_retries` — and the provider those calls go through is the monitor's,
+not the evaluator's. Nothing else to configure.
+
+A judge prompt is a template, so it can take your own config params too:
+add `property_name` and write `{property_name}` in place of the hotel's
+name, and one evaluator serves every property in the group.
 
 ## Step 6 — Score last week with this week's standards
 
