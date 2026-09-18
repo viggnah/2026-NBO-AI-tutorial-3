@@ -248,7 +248,34 @@ showed that span count tracks what the agent decided to do.
 > `data.count`, an unfiltered one as `data.totalCount`, so
 > `jq '.data.count // .data.totalCount'` covers both.
 
-## Step 6 - The tool the agent could not use
+## Step 6 - Ask in English
+
+You already installed what this needs. The `manage-agent` skill from
+module 01 taught your assistant `amctl`, and traces are part of what it
+covers - its `triage.md` walks build → logs → metrics → traces in that
+order, and knows which conditions to reach for.
+
+So there is nothing to set up. Ask:
+
+> *"Look at the last hour of traces for grand-meridian-concierge in
+> default. Which request was slowest, and where did the time actually
+> go?"*
+
+The assistant lists the traces, picks the outlier, pulls its spans and
+reads the durations back to you. Same data as step 4 - the difference is
+that you did not have to know the shape of the JSON to ask the question.
+
+Then ask something you have not done by hand, and watch it pick its own
+route:
+
+> *"Which of those requests called more than one tool, and which tools
+> were they?"*
+
+Three doors onto the same traces, then: the console when you want to see
+the shape of a request, the CLI when you want it in a script, and this
+when you would rather describe the question than construct it.
+
+## Step 7 - The tool the agent could not use
 
 Ask the most ordinary question a hotel guest asks, three times:
 
@@ -399,28 +426,16 @@ code and a span count all decline to look.
 > shipping this bug - and traces are how you find the one you already
 > shipped.
 
-## Step 7 - Ask in English
+One last thing, now that there is a real incident in the window rather
+than a tidy example. Both versions are still in there - the three
+apologies, and the answer that worked. So ask the assistant from step 6:
 
-You already installed what this needs. The `manage-agent` skill from
-module 01 taught your assistant `amctl`, and traces are part of what it
-covers - its `triage.md` walks build → logs → metrics → traces in that
-order, and knows which conditions to reach for.
+> *"Compare the dining requests from earlier with the most recent one.
+> What changed?"*
 
-So there is nothing to set up. Ask:
-
-> *"Look at the last hour of traces for grand-meridian-concierge in
-> default. Which request was slowest, and where did the time actually
-> go?"*
-
-The assistant lists the traces, picks the outlier, pulls its spans and
-reads the durations back to you. Same data as step 4 - the difference is
-that you did not have to know the shape of the JSON to ask the question.
-
-Then ask it the question this module opened with, and watch it pick its
-own route:
-
-> *"Did any tool call fail in the last hour without the request
-> failing?"*
+It has everything it needs: the traces, the spans, and the tool arguments
+that differ. This is the question you would actually ask at half past
+five on a Friday, and it is worth knowing you can ask it that way.
 
 ## How the traces actually get there
 
@@ -456,7 +471,7 @@ fast, cheap answer that quoted a room rate the hotel does not charge.
 Every span would be green. The latency would be fine. The token count
 would be unremarkable.
 
-Step 6 is the closest it gets, and it still needed you to go looking. The
+Step 7 is the closest it gets, and it still needed you to go looking. The
 trace named the bug once you suspected one, but nothing raised a hand -
 the apology and the good answer came back through the same green spans,
 because nothing was scoring either of them.
@@ -468,7 +483,7 @@ That gap is module 03.
 - [Observability concepts](https://wso2.github.io/agent-manager/docs/) - the full attribute contract and the manual-instrumentation path
 - [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) - where `gen_ai.usage.input_tokens` and friends are defined
 - `amctl agent traces export --since 24h` - bulk dump of full span data, for analysing traffic outside the console
-- **A dedicated observability MCP server** (`am-obs-mcp`) ships alongside the lifecycle one, with tools for logs, metrics, traces, trace details and span details. Step 7 does not need it - the `manage-agent` skill already drives the CLI - but if you would rather your assistant read the API directly than shell out, ask your instance where it lives: `curl -s <your-api-base-url>/api/v1/config` returns an `observerBaseUrl`, and `/mcp` on that host is the endpoint. It has its own client ID (`am-obs-mcp`) and callback port, so a token issued for the lifecycle server will not work on it.
+- **A dedicated observability MCP server** (`am-obs-mcp`) ships alongside the lifecycle one, with tools for logs, metrics, traces, trace details and span details. Step 6 does not need it - the `manage-agent` skill already drives the CLI - but if you would rather your assistant read the API directly than shell out, ask your instance where it lives: `curl -s <your-api-base-url>/api/v1/config` returns an `observerBaseUrl`, and `/mcp` on that host is the endpoint. It has its own client ID (`am-obs-mcp`) and callback port, so a token issued for the lifecycle server will not work on it.
 
 ---
 
