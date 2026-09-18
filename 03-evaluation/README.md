@@ -291,10 +291,13 @@ def my_evaluator(
 
 Three things follow from that:
 
-- **Declare the config params before you paste.** Add `valid_amounts`
-  (array, default `[]`) and `max_nights` (integer, default `30`) in the
-  **Config Params** section and those two lines appear in the header,
-  typed. Paste first and the names in your body are undefined.
+- **Declare the config params before you paste, each with a default.** In
+  the **Config Params** section add `valid_amounts` - type `array`,
+  **Default** `[]` - and `max_nights` - type `integer`, **Default** `30`.
+  Both lines then appear in the header, typed, carrying those defaults;
+  the real prices go in later, per monitor. Paste first and the names in
+  your body are undefined, and leave a Default box empty and the
+  parameter does not reach your function.
 - **Use the parameters by their own names** - `valid_amounts`, not
   `self.valid_amounts`. They are function arguments. (The built-ins you
   read in step 3 are methods on a class, which is why their source says
