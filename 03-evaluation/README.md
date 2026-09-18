@@ -245,26 +245,6 @@ rung on a rubric you can read, against a prompt you can audit. And when a
 judge scores something you disagree with, this is the page that tells you
 why.
 
-The same data is on the CLI, if you would rather script it than click. List
-what your instance offers, with levels and types - and **pass a `limit`**,
-because the endpoint pages at 20 and there are more than that:
-
-```bash
-amctl api --project default '/orgs/{org}/evaluators' -X GET -f limit=100 \
-  | jq -r '.total as $t | .evaluators[] | "\(.type)\t\(.level)\t\(.displayName)"' \
-  | sort
-```
-
-At `1.0.0` that is **24 built-ins - 9 rule-based and 15 LLM-as-judge** -
-covering latency, length, token budget, tool coverage and prohibited
-content on the rule side, and accuracy, groundedness, helpfulness,
-relevance, completeness, clarity, reasoning quality, error recovery, path
-efficiency, instruction following, coherence, conciseness, safety and
-tone on the judge side.
-
-Check `.total` against the number of rows you got back before assuming
-you have seen the whole catalogue.
-
 ### Three levels
 
 The same list shows a **level** per evaluator, and it decides what the
@@ -292,29 +272,10 @@ a trace-level **code** evaluator that pulls every money figure out of the
 answer and checks it against the published price list, allowing for
 nightly multiples of a stay length the guest actually asked about.
 
-Custom evaluators are written in the console - **Evaluation → Evaluators
-→ Create Evaluator** - which is a slow loop to iterate in. So test it on
-your machine first:
+Custom evaluators are written in the console: **Resources → Evaluators →
+Create Evaluator**, the same library you read the built-ins in.
 
-```bash
-cd evaluators
-./harness.py room_rate_accuracy.py
-```
-
-```
-real · one room                            100% pass  All 1 money figure matches ...
-real · a 3-night total                     100% pass  All 2 money figures match ...
-real · no prices at all                   SKIP    -    No money figures in the response
-caught · a rate we do not charge             0% FAIL  1 of 1 money figure not on the price list ...
-missed · plausible arithmetic, wrong room  100% pass  All 2 money figures match ...
-```
-
-[`harness.py`](evaluators/harness.py) stands in the same `Trace` and
-`EvalResult` the platform injects, wraps your body in the same header the
-console generates, runs it against sample traces and prints the scores. A
-second to run, instead of a save-and-wait-for-a-run cycle.
-
-### What the editor actually gives you
+### What the editor gives you
 
 You do not write the whole file. The top of the editor is generated and
 read-only:
@@ -354,6 +315,14 @@ Four things follow from that, and each one is a way to lose ten minutes:
 Paste the block between the markers over the editor's example body, and
 save.
 
+Then try it on traffic you already have. A **Past Traces** monitor
+containing only this evaluator scores the whole window in seconds - rules
+are free and instant, so there is no reason to guess whether it works.
+Read the explanations, adjust, save, run it again: the window does not
+move, so two runs over the same traces are directly comparable. That is
+the iteration loop, and it is the same mechanism step 6 uses for a
+different purpose.
+
 > Two conveniences worth knowing. The editor **underlines fields that do
 > not exist** on the type you are working with - `trace.answer` gets a
 > squiggle reading *Unknown field 'answer' on trace* - so a typo surfaces
@@ -378,10 +347,12 @@ save.
 
 ## Step 5 - Where rules stop
 
-Look at the harness output again. The last case scores 100% and should
-not: *"$420 per night, or $760 for two nights"* is wrong for a $420 room,
-but $760 is exactly two nights of the $380 junior suite, so a rule
-holding only a price list cannot fault it.
+Run the evaluator you just wrote over enough traffic and it will let
+something through that it should not. Here is the shape of it: *"$420 per
+night, or $760 for two nights."* Wrong for a $420 room - two nights is
+$840 - but $760 is exactly two nights of the $380 junior suite, so a rule
+holding a price list and a night count cannot fault it. Every figure is on
+the list, and the total is a legitimate multiple of one of them.
 
 No amount of regex fixes that. It needs something that can read which
 room was being discussed - which is what a judge does, and why two of them

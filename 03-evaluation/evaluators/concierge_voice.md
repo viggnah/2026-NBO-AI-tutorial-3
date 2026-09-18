@@ -15,10 +15,10 @@ had in front of it.
 ## Why a judge and not a rule
 
 `room_rate_accuracy.py` next door is a rule, and it catches an invented
-rate cleanly. Run `harness.py` and you will see it miss one case: an
-answer offering *"$420 per night, or $760 for two nights"*. That total is
-wrong for a $420 room - but it is exactly two nights of the $380 junior
-suite, so a rule holding only a price list cannot fault it.
+rate cleanly. It also misses this: an answer offering *"$420 per night, or
+$760 for two nights"*. That total is wrong for a $420 room - but it is
+exactly two nights of the $380 junior suite, so a rule holding a price
+list cannot fault it.
 
 Catching that needs something that can read *which room was being
 discussed*. So does every other rule in `agent/system_prompt.py` worth
