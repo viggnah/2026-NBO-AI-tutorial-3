@@ -65,7 +65,7 @@ in it. Only the first has no default:
 
 | Parameter | Set to | Why |
 |---|---|---|
-| `model` | `gpt-4o` | Required, and **bare** - the provider already names the vendor and the platform prefixes its template, so `openai/gpt-4o` is sent as `openai/openai/gpt-4o` and rejected as an invalid model ID. Step 1 needs arithmetic and cross-referencing against tool output; a smaller judge scores tone well and grounding poorly. |
+| `model` | `gpt-4o` | Required, and just the model name - the provider already names the vendor. Step 1 needs arithmetic and cross-referencing against tool output; a smaller judge scores tone well and grounding poorly. |
 | `temperature` | `0` (the default) | You want the same trace to score the same way twice. |
 | `max_tokens` | `1024` (the default) | Enough for a score and a two-sentence explanation. |
 | `max_retries` | `2` (the default) | Retries when the model returns something unparseable. |
@@ -73,9 +73,9 @@ in it. Only the first has no default:
 The *provider* those calls go through is not set here - you choose it once
 per monitor, and every judge in that monitor shares it.
 
-If the judge reports *skipped* on every trace, read the run's **Logs**
-tab before touching the prompt: the skip reason carries the model's own
-error, and the usual answer is the model name.
+The run's **Logs** tab is where a judge accounts for itself: how many
+evaluations it scored, how many it declined, and the reason for each one
+it declined.
 
 ## Making it reusable
 

@@ -143,14 +143,10 @@ complete answer looks like for your agent.
 > it. Keep `temperature` at `0.0` - you want the same trace to score the
 > same way twice.
 >
-> **Give the model name bare - `gpt-4o`, not `openai/gpt-4o`.** The
-> provider you picked already says which vendor this is, and the platform
-> prefixes its template handle for you. Spell the vendor out yourself and
-> the call goes out as `openai/openai/gpt-4o`, which the gateway rejects
-> as an invalid model ID. The judge then reports *skipped* on every trace
-> - and a run where everything skipped still finishes green, with `N/A`
-> where the score should be. That is the single most likely reason a
-> monitor looks like it worked and scored nothing.
+> **Give the model name bare: `gpt-4o`.** The provider you picked already
+> says which vendor this is, so the model setting is just the model -
+> exactly as the field's own hint has it (`gpt-4o-mini`,
+> `claude-sonnet-4-6`).
 
 Give it a few minutes. The rule-based evaluators finish almost instantly;
 the judges make a model call per evaluation, and `Tone` makes one per
