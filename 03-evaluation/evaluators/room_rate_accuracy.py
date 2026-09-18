@@ -1,4 +1,4 @@
-# Room Rate Accuracy — a custom code evaluator, trace level.
+# Room Rate Accuracy - a custom code evaluator, trace level.
 #
 # Checks that every money figure in the agent's answer can be accounted
 # for by the hotel's real price list: either a published price, or a
@@ -6,15 +6,15 @@
 #
 # This is the check no built-in evaluator can do for you, because only you
 # know what your rooms cost. It is also the failure that worries people
-# most — a confident, well-written, fast, cheap answer quoting a rate the
+# most - a confident, well-written, fast, cheap answer quoting a rate the
 # hotel does not charge.
 #
 # HOW THE CONSOLE EDITOR WORKS. You do not write the whole file. The top of
-# the editor is generated and read-only — the imports, the function name,
+# the editor is generated and read-only - the imports, the function name,
 # the typed first parameter that sets the evaluation level, and one line
 # per config parameter you declare in the Config Params section beneath it.
 # You write the body. Declare these two parameters first, in the Config
-# Params section — each with a default, because a parameter marked
+# Params section - each with a default, because a parameter marked
 # Required with no default stops the evaluator registering at all:
 #
 #   Key            Type     Default
@@ -29,16 +29,16 @@
 #
 #   def my_evaluator(
 #       trace: Trace,
-#       # Configurable parameters — defined in the Config Params section below.
+#       # Configurable parameters - defined in the Config Params section below.
 #       valid_amounts: list = Param(default=[], description="Published nightly prices"),
 #       max_nights: int = Param(default=30, description="Largest multiple to accept as a total"),
 #   ) -> EvalResult:
 #
 # So `trace`, `valid_amounts` and `max_nights` are already in scope, under
-# those names — they are function arguments, not attributes, so it is
+# those names - they are function arguments, not attributes, so it is
 # `valid_amounts` and never `self.valid_amounts`. The function is always
 # called `my_evaluator`, and anything you need to import is imported inside
-# the body, since the header is not yours to edit — which is why
+# the body, since the header is not yours to edit - which is why
 # `import re` is the first line below.
 #
 # Everything between the two markers is the body. Select the editor's
@@ -112,7 +112,7 @@
     return EvalResult(
         score=len(ok) / len(amounts),
         # One rate the hotel does not charge is a failed check, whatever the
-        # other figures did — so do not let the proportion decide pass/fail.
+        # other figures did - so do not let the proportion decide pass/fail.
         passed=False,
         explanation=f"{len(unaccounted)} of {len(amounts)} money {noun} not "
                     f"on the price list, and not a multiple of it for any "

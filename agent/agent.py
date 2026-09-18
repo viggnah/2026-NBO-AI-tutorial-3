@@ -1,4 +1,4 @@
-"""Hotel concierge agent — FastAPI service exposing POST /chat.
+"""Hotel concierge agent - FastAPI service exposing POST /chat.
 
 Module 00 baseline: a deliberately traditional agent deployment.
 - One env var holds the OpenAI key.

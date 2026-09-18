@@ -6,7 +6,7 @@ venv/
 *.egg-info/
 .pytest_cache/
 
-# Secrets — never commit a real key
+# Secrets - never commit a real key
 .env
 *.key
 openai_key.txt

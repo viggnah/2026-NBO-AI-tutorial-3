@@ -1,4 +1,4 @@
-# Module 03 — Evaluation: measuring something that answers differently every time
+# Module 03 - Evaluation: measuring something that answers differently every time
 
 **Duration:** 18 min
 
@@ -26,7 +26,7 @@ curl -s -X POST "$AGENT_URL/chat" -H "X-API-Key: $AGENT_KEY" \
 ```
 
 Or send it twice from the console's **Try It** tab, which needs no key
-and no endpoint — the point lands the same way, and faster.
+and no endpoint - the point lands the same way, and faster.
 
 Two runs produce two different sentences. Both may be correct. Neither is
 equal to the other, and equality is what an assertion is made of.
@@ -53,7 +53,7 @@ find out whether last week was fine.
 
 The third property is the one worth remembering. Step 6 puts it to use.
 
-## Step 1 — Create a monitor
+## Step 1 - Create a monitor
 
 A **monitor** is a configured evaluation job: a set of evaluators, an
 agent, an environment, and a window of traces to run over.
@@ -63,12 +63,12 @@ agent, an environment, and a window of traces to run over.
 3. Give it a title. The identifier fills itself in.
 4. For **Data Collection Type**, choose **Past Traces** and set the window
    to cover the traffic module 02 generated. (**Future Traces** is the
-   other option — a recurring schedule, minimum five minutes, for ongoing
+   other option - a recurring schedule, minimum five minutes, for ongoing
    production monitoring. Come back to it in step 6.)
 5. Pick evaluators from the grid, configuring each as you add it. Take
    five, and deliberately take both kinds:
 
-   **Rule-based** — deterministic, instant, free:
+   **Rule-based** - deterministic, instant, free:
 
    | Evaluator | Level | Set |
    |---|---|---|
@@ -77,7 +77,7 @@ agent, an environment, and a window of traces to run over.
    | **Content Safety** | trace | `prohibited_strings`: `guarantee`, `refund`, `free upgrade` · `prohibited_patterns`: the two below |
 
    `prohibited_patterns` takes a list of regular expressions. Add these
-   two — a bare 13-to-16-digit run, and an email address:
+   two - a bare 13-to-16-digit run, and an email address:
 
    ```text
    \b\d{13,16}\b
@@ -89,12 +89,12 @@ agent, an environment, and a window of traces to run over.
    because they travel inside a request body.
 
    Both are things a reply should never contain, and neither one fires on
-   what a concierge answer legitimately says — `450 USD`, `GM-2026-0918`
+   what a concierge answer legitimately says - `450 USD`, `GM-2026-0918`
    and `confirmation 12345` all pass. The digit pattern is strict about
    separators, so `4111 1111 1111 1111` written with spaces slips past it;
    widen it if your traffic looks like that.
 
-   **LLM-as-judge** — a model reads the trace and scores it:
+   **LLM-as-judge** - a model reads the trace and scores it:
 
    | Evaluator | Level | Set |
    |---|---|---|
@@ -113,14 +113,14 @@ Those two judges are chosen for a reason.
 
 **Completeness** checks whether the answer addressed everything the guest
 asked, and the traffic from module 02 gives it real work to do. Two of
-those prompts are deliberately multi-part — *"compare a junior suite and
+those prompts are deliberately multi-part - *"compare a junior suite and
 the presidential suite"* and *"what can we order to the room, and what is
 worth doing nearby tomorrow"*. An answer that covers the first half of
 either and quietly drops the second is a specific, recognisable failure,
 and it is not one any rule can see.
 
 **Tone** is **LLM-level**, so it scores every model call individually
-rather than the final answer — which is how you catch something off-brand
+rather than the final answer - which is how you catch something off-brand
 in an intermediate reasoning step that the final answer smoothed over. It
 takes a `context` string, so "luxury hotel concierge" is a different bar
 from "casual chat".
@@ -128,27 +128,27 @@ from "casual chat".
 Picking one of each level also makes the dashboard in step 2 more
 interesting, because the summary breaks results out per level.
 
-Swap in **Helpfulness** or **Relevance** if you prefer — both are
+Swap in **Helpfulness** or **Relevance** if you prefer - both are
 trace-level and both apply to every request. `Completeness` also takes an
 optional `success_criteria` string if you want to spell out what a
 complete answer looks like for your agent.
 
 > **Fill in the optional config as you add each evaluator.** Content
 > Safety with no prohibited strings and no patterns has nothing to look
-> for, so it reports **skipped** rather than inventing a verdict — which
+> for, so it reports **skipped** rather than inventing a verdict - which
 > is the honest answer, and correctly kept out of the average. Give it
 > real values and it starts contributing a real score.
 >
 > `model` is the one setting with no default: judges will not run without
-> it. Keep `temperature` at `0.0` — you want the same trace to score the
+> it. Keep `temperature` at `0.0` - you want the same trace to score the
 > same way twice.
 >
-> **Give the model name bare — `gpt-4o`, not `openai/gpt-4o`.** The
+> **Give the model name bare - `gpt-4o`, not `openai/gpt-4o`.** The
 > provider you picked already says which vendor this is, and the platform
 > prefixes its template handle for you. Spell the vendor out yourself and
 > the call goes out as `openai/openai/gpt-4o`, which the gateway rejects
 > as an invalid model ID. The judge then reports *skipped* on every trace
-> — and a run where everything skipped still finishes green, with `N/A`
+> - and a run where everything skipped still finishes green, with `N/A`
 > where the score should be. That is the single most likely reason a
 > monitor looks like it worked and scored nothing.
 
@@ -156,25 +156,25 @@ Give it a few minutes. The rule-based evaluators finish almost instantly;
 the judges make a model call per evaluation, and `Tone` makes one per
 model call in every trace. It is a job, not a page load.
 
-## Step 2 — Read the dashboard
+## Step 2 - Read the dashboard
 
 Click the monitor to open it.
 
-- **Agent Performance** — a radar chart, one axis per evaluator, so
+- **Agent Performance** - a radar chart, one axis per evaluator, so
   strengths and weaknesses read at a glance.
-- **Evaluation Summary** — the weighted average and the total count,
+- **Evaluation Summary** - the weighted average and the total count,
   broken out per level. Both a trace row and an LLM row appear, because
   you configured an evaluator at each: the trace count matches your
   traffic, while the LLM count is higher, since `Tone` ran once per model
   call and most requests make two.
-- **Performance by Evaluator** — a time series per evaluator. This is the
+- **Performance by Evaluator** - a time series per evaluator. This is the
   regression detector: a line that steps down after a Tuesday deploy is
   the whole reason to run this continuously.
-- **Score breakdown by model** — one row per model used across the
+- **Score breakdown by model** - one row per model used across the
   evaluated traces, with the LLM-level scores for each. With one model in
   play it is a single row; point two agents at two models and this is how
   you compare them on identical traffic.
-- **Run history** — every run, with status, its trace window, and logs.
+- **Run history** - every run, with status, its trace window, and logs.
   Individual runs can be re-run.
 
 Then go back to **Traces**, because the scores are there too:
@@ -184,11 +184,11 @@ Then go back to **Traces**, because the scores are there too:
 - a **Scores** tab gives each evaluator's result with its **explanation**
 
 Read the explanations, not just the numbers. A score tells you something
-changed; the explanation tells you what, in a sentence, per trace — so you
+changed; the explanation tells you what, in a sentence, per trace - so you
 can act on a result without opening the trace to work out what the
 evaluator objected to.
 
-## Step 3 — What you just ran
+## Step 3 - What you just ran
 
 You used both kinds of evaluator in that monitor, and the difference
 between them is not cosmetic.
@@ -220,14 +220,14 @@ if not all_prohibited and not self.prohibited_patterns:
     return EvalResult.skip("No prohibited content configured. Add at least one prohibited string or pattern.")
 ```
 
-A few lines further down is what your two patterns are handed to —
+A few lines further down is what your two patterns are handed to -
 `re.search(pattern, output, flags)`, with `re.IGNORECASE` unless you set
 `case_sensitive`. So they are ordinary Python regular expressions, and they
 are matched against `trace.output`: this evaluator scores what the agent
 *said*, not what the guest asked.
 
 Now open **Tone**. Same page, except the panel is headed **Prompt
-Template** — because a judge's implementation *is* its prompt, and all of
+Template** - because a judge's implementation *is* its prompt, and all of
 it is there: the criterion, the evaluation steps, the template variables
 that decide what the judge sees (`{llm_span.format_messages()}`), and the
 rubric it scores against.
@@ -240,13 +240,13 @@ rubric it scores against.
 ```
 
 That is worth thirty seconds of reading, because it changes what a judge
-score means. A `0.75` from `Tone` is not a model's vague opinion — it is a
+score means. A `0.75` from `Tone` is not a model's vague opinion - it is a
 rung on a rubric you can read, against a prompt you can audit. And when a
 judge scores something you disagree with, this is the page that tells you
 why.
 
 The same data is on the CLI, if you would rather script it than click. List
-what your instance offers, with levels and types — and **pass a `limit`**,
+what your instance offers, with levels and types - and **pass a `limit`**,
 because the endpoint pages at 20 and there are more than that:
 
 ```bash
@@ -255,7 +255,7 @@ amctl api --project default '/orgs/{org}/evaluators' -X GET -f limit=100 \
   | sort
 ```
 
-At `1.0.0` that is **24 built-ins — 9 rule-based and 15 LLM-as-judge** —
+At `1.0.0` that is **24 built-ins - 9 rule-based and 15 LLM-as-judge** -
 covering latency, length, token budget, tool coverage and prohibited
 content on the rule side, and accuracy, groundedness, helpfulness,
 relevance, completeness, clarity, reasoning quality, error recovery, path
@@ -269,7 +269,7 @@ you have seen the whole catalogue.
 
 The same list shows a **level** per evaluator, and it decides what the
 evaluator sees and how often it runs. You have already seen two of the
-three in action — `Completeness` at trace level, `Tone` at LLM level:
+three in action - `Completeness` at trace level, `Tone` at LLM level:
 
 | Level | Sees | Runs |
 |---|---|---|
@@ -281,7 +281,7 @@ You do not configure any iteration logic. `Tone` ran once per model call
 without being told to, which is why its evaluation count in step 2 was
 roughly double the trace count.
 
-## Step 4 — Write an evaluator for your own domain
+## Step 4 - Write an evaluator for your own domain
 
 The built-ins cover the dimensions every agent shares. They cannot cover
 the one from the top of this page, because only you know what your rooms
@@ -292,8 +292,8 @@ a trace-level **code** evaluator that pulls every money figure out of the
 answer and checks it against the published price list, allowing for
 nightly multiples of a stay length the guest actually asked about.
 
-Custom evaluators are written in the console — **Evaluation → Evaluators
-→ Create Evaluator** — which is a slow loop to iterate in. So test it on
+Custom evaluators are written in the console - **Evaluation → Evaluators
+→ Create Evaluator** - which is a slow loop to iterate in. So test it on
 your machine first:
 
 ```bash
@@ -304,7 +304,7 @@ cd evaluators
 ```
 real · one room                            100% pass  All 1 money figure matches ...
 real · a 3-night total                     100% pass  All 2 money figures match ...
-real · no prices at all                   SKIP    —    No money figures in the response
+real · no prices at all                   SKIP    -    No money figures in the response
 caught · a rate we do not charge             0% FAIL  1 of 1 money figure not on the price list ...
 missed · plausible arithmetic, wrong room  100% pass  All 2 money figures match ...
 ```
@@ -326,7 +326,7 @@ from amp_evaluation.trace.models import Trace
 
 def my_evaluator(
     trace: Trace,
-    # Configurable parameters — defined in the Config Params section below.
+    # Configurable parameters - defined in the Config Params section below.
     valid_amounts: list = Param(default=[], description="Published nightly prices"),
     max_nights: int = Param(default=30, description="Largest multiple to accept as a total"),
 ) -> EvalResult:
@@ -342,7 +342,7 @@ Four things follow from that, and each one is a way to lose ten minutes:
   with no default stops the evaluator registering at all, and the run
   fails with `missing required parameter(s)` even though the monitor
   supplied a value. Set `[]` and `30` and it runs.
-- **Use the parameters by their own names** — `valid_amounts`, not
+- **Use the parameters by their own names** - `valid_amounts`, not
   `self.valid_amounts`. They are function arguments. (The built-ins you
   read in step 3 are methods on a class, which is why their source says
   `self.`; yours is not.)
@@ -355,8 +355,8 @@ Paste the block between the markers over the editor's example body, and
 save.
 
 > Two conveniences worth knowing. The editor **underlines fields that do
-> not exist** on the type you are working with — `trace.answer` gets a
-> squiggle reading *Unknown field 'answer' on trace* — so a typo surfaces
+> not exist** on the type you are working with - `trace.answer` gets a
+> squiggle reading *Unknown field 'answer' on trace* - so a typo surfaces
 > before a run rather than during one. And the **AI Copilot Prompt** button
 > hands you a ready-made prompt for whatever assistant you use, already
 > pointing at the framework reference the platform serves at
@@ -365,7 +365,7 @@ save.
 > a helper that does not exist.
 
 > **`EvalResult.skip()` is not a zero.** Use it when the evaluator does
-> not apply — no output, no prices, no retrieval step. Skips are tracked
+> not apply - no output, no prices, no retrieval step. Skips are tracked
 > separately and excluded from the average, so an evaluator that honestly
 > declines to judge does not drag the score down.
 >
@@ -373,10 +373,10 @@ save.
 > and `Context Relevance` both take an `on_missing_context` setting:
 > `skip` (the default) when the trace has no tool results or no retrieval
 > step to check against, or `zero` to treat that as a failure instead.
-> Neither is in the monitor you just built — worth knowing before you add
+> Neither is in the monitor you just built - worth knowing before you add
 > one and wonder why an axis is empty.
 
-## Step 5 — Where rules stop
+## Step 5 - Where rules stop
 
 Look at the harness output again. The last case scores 100% and should
 not: *"$420 per night, or $760 for two nights"* is wrong for a $420 room,
@@ -384,7 +384,7 @@ but $760 is exactly two nights of the $380 junior suite, so a rule
 holding only a price list cannot fault it.
 
 No amount of regex fixes that. It needs something that can read which
-room was being discussed — which is what a judge does, and why two of them
+room was being discussed - which is what a judge does, and why two of them
 went into the monitor in step 1.
 
 There is a built-in aimed squarely at this one: **Groundedness** checks
@@ -397,23 +397,23 @@ for. Add it and choose its `on_missing_context` behaviour to suit.
 What no built-in can know is your house style:
 [`evaluators/concierge_voice.md`](evaluators/concierge_voice.md) is a
 prompt template that scores the five service standards written into
-`agent/system_prompt.py` — grounded in tool data, answer first, in
+`agent/system_prompt.py` - grounded in tool data, answer first, in
 character, no leaked plumbing, honest about limits. None of those five is
 expressible as a rule, and all five are things a hotel would actually
 fire someone over.
 
 Add it in the console the same way, choosing **LLM-Judge** as the type
 and pasting the prompt. Pick the type and the Config Params section
-arrives with the four parameters every judge takes already in it — `model`
+arrives with the four parameters every judge takes already in it - `model`
 (required, and bare: `gpt-4o`), `temperature`, `max_tokens`,
-`max_retries` — and the provider those calls go through is the monitor's,
+`max_retries` - and the provider those calls go through is the monitor's,
 not the evaluator's. Nothing else to configure.
 
 A judge prompt is a template, so it can take your own config params too:
 add `property_name` and write `{property_name}` in place of the hotel's
 name, and one evaluator serves every property in the group.
 
-## Step 6 — Score last week with this week's standards
+## Step 6 - Score last week with this week's standards
 
 You have just written two evaluators that did not exist when the traffic
 in step 1 was served. Create a **second Past-Traces monitor** over **the
@@ -431,11 +431,11 @@ evaluator set and an interval. It starts within a minute, runs on
 schedule, and the time series in step 2 becomes a regression alarm rather
 than a snapshot.
 
-## Step 7 — The same monitor, every time
+## Step 7 - The same monitor, every time
 
 The console is the right place to design a monitor. Once it is designed,
 you want it identical on every agent and after every release. This step
-runs on `amctl`, so it needs a self-managed install — see the
+runs on `amctl`, so it needs a self-managed install - see the
 [repo README](../README.md#prerequisites):
 
 ```bash
@@ -449,13 +449,13 @@ from your org, builds the monitor body, and creates it.
 As written it configures the **rule-based** subset of step 1's set, for one
 practical reason: rule-based evaluators need no LLM credentials, so the
 script runs anywhere without a secret to inject. Add the judges and their
-provider configuration when you want them — nothing about this path is
+provider configuration when you want them - nothing about this path is
 rule-only.
 
 Both kinds work in either monitor type. **Evaluator type and monitor type
 are independent choices:** a Past-Traces run and a scheduled Future-Traces
 monitor can each hold any mix of rules and judges, and a real quality bar
-usually holds both — as step 1's does.
+usually holds both - as step 1's does.
 
 Read the result back:
 
@@ -478,18 +478,18 @@ amctl api --project default \
 | Retrospective scoring | new criteria, old traffic, no agent change |
 
 One thing is still missing. All of this assumed the platform built and
-deployed the agent — and in a real estate, most agents were not built
+deployed the agent - and in a real estate, most agents were not built
 here.
 
 That is module 04.
 
 ## Going further
 
-- [Evaluation concepts](https://wso2.github.io/agent-manager/docs/) — the full built-in reference, all parameters, and the custom-evaluator data models
+- [Evaluation concepts](https://wso2.github.io/agent-manager/docs/) - the full built-in reference, all parameters, and the custom-evaluator data models
 - Custom evaluator code cannot import `os`, `subprocess`, `socket`, `ctypes` or `importlib`, and dynamic `__import__()` is rejected at save time. Write evaluators that need none of them.
-- Agent-level and LLM-level evaluators unlock two extra dashboard tables — score by agent, and score by model — which is how you compare models on the same traffic.
+- Agent-level and LLM-level evaluators unlock two extra dashboard tables - score by agent, and score by model - which is how you compare models on the same traffic.
 
 ---
 
-Previous: [Module 02 — Observability](../02-observability/README.md) ·
-Next: [Module 04 — External Agents](../04-external-agents/README.md)
+Previous: [Module 02 - Observability](../02-observability/README.md) ·
+Next: [Module 04 - External Agents](../04-external-agents/README.md)

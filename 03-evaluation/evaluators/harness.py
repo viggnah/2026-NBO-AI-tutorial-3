@@ -10,7 +10,7 @@ about a second.
 
 In the console you write only the body of the evaluator: the imports, the
 function name and the typed parameters above it are generated and
-read-only. So this harness does the same thing the console does — it takes
+read-only. So this harness does the same thing the console does - it takes
 the body between the `paste from here` / `to here` markers, puts the same
 generated header in front of it, and calls the result with `CONFIG` as the
 config parameters. `EvalResult` and a trace-level `Trace` with the surface
@@ -48,7 +48,7 @@ class EvalResult:
 
     def render(self) -> str:
         if self.skipped:
-            return f"SKIP    —     {self.explanation}"
+            return f"SKIP    -     {self.explanation}"
         mark = "pass" if self.passed else "FAIL"
         return f"{self.score:>5.0%} {mark}  {self.explanation}"
 
@@ -88,7 +88,7 @@ sys.modules["amp_evaluation.trace"] = types.ModuleType("amp_evaluation.trace")
 sys.modules["amp_evaluation.trace.models"] = _models
 
 
-# Real answers from the deployed concierge, plus two that never happened —
+# Real answers from the deployed concierge, plus two that never happened -
 # the point of the evaluator is to tell them apart.
 CASES = [
     ("real · one room",
@@ -169,7 +169,7 @@ def main() -> None:
     print("as they should. The fourth invents a rate and is caught.")
     print()
     print("The fifth is the interesting one. $760 for two nights of a $420")
-    print("room is wrong — but it is exactly two nights of the $380 junior")
+    print("room is wrong - but it is exactly two nights of the $380 junior")
     print("suite, so a rule that only knows the price list cannot fault it.")
     print("Catching that needs a judge that can read which room was being")
     print("discussed. That is what concierge_voice.md and the built-in")

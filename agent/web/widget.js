@@ -1,7 +1,7 @@
-// The Grand Meridian — concierge chat widget.
+// The Grand Meridian - concierge chat widget.
 //
 // Vanilla JS, no build step. Two CDN deps loaded by index.html before this file:
-// `marked` (markdown parser) and `DOMPurify` (sanitizer) — both required for
+// `marked` (markdown parser) and `DOMPurify` (sanitizer) - both required for
 // rendering bot replies as markdown. User messages stay escaped (no markdown).
 // Stateless server: this widget keeps the full message thread in memory and sends
 // it on every POST. Five UI states: empty (greeting + chips), loading, success,
@@ -10,11 +10,11 @@
   "use strict";
 
   // Endpoint resolution precedence:
-  //   1. ?agent=<url>      — overrides and persists to localStorage. ?agent=reset clears.
-  //   2. localStorage      — sticky across reloads once set via the query param.
+  //   1. ?agent=<url>      - overrides and persists to localStorage. ?agent=reset clears.
+  //   2. localStorage      - sticky across reloads once set via the query param.
   //   3. window.GRAND_MERIDIAN_AGENT_URL (set in index.html, the committed default).
   //   4. http://localhost:8000/chat.
-  // Demo flow: paste `?agent=<deployed-url>` once, reload — sticks until ?agent=reset.
+  // Demo flow: paste `?agent=<deployed-url>` once, reload - sticks until ?agent=reset.
   const ENDPOINT = (() => {
     const LS_KEY = "gmAgentUrl";
     const fallback = window.GRAND_MERIDIAN_AGENT_URL || "http://localhost:8000/chat";
@@ -162,7 +162,7 @@
       .replace(/>/g, "&gt;");
   }
 
-  // Configure marked once. `breaks: true` — single newlines render as <br>,
+  // Configure marked once. `breaks: true` - single newlines render as <br>,
   // matching how the LLM tends to format chat replies. `gfm: true` for
   // task lists, autolinks, fenced code.
   if (typeof marked !== "undefined" && typeof marked.setOptions === "function") {
@@ -324,7 +324,7 @@
         return;
       }
       const data = await res.json();
-      const reply = (data && data.response) || "I'm having trouble — could you try again?";
+      const reply = (data && data.response) || "I'm having trouble - could you try again?";
       renderBot(reply);
     } catch (err) {
       typing.remove();

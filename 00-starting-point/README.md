@@ -1,4 +1,4 @@
-# Module 00 — Starting Point: a working agent, running locally
+# Module 00 - Starting Point: a working agent, running locally
 
 **Duration:** 5 min
 
@@ -10,8 +10,8 @@ POST /chat   { "message": str, "session_id": str, "context": {} }
          →   { "response": str }
 ```
 
-Three tools — `check_room_availability`, `get_room_service_menu`,
-`get_local_recommendations` — and a unit-test suite covering each tool's
+Three tools - `check_room_availability`, `get_room_service_menu`,
+`get_local_recommendations` - and a unit-test suite covering each tool's
 pure logic.
 
 Nothing here is wrong. This is what a working agent looks like on the day
@@ -25,7 +25,7 @@ python3.11 -m venv .venv && source .venv/bin/activate   # 3.11 or 3.12; avoid 3.
 pip install -r requirements.txt
 
 cp .env.example .env
-# Edit .env — paste your OPENAI_API_KEY
+# Edit .env - paste your OPENAI_API_KEY
 set -a; source .env; set +a
 
 python main.py
@@ -57,8 +57,8 @@ open web/index.html         # macOS; Linux: xdg-open web/index.html
 ```
 
 The Grand Meridian landing page loads. Click the launcher in the
-bottom-right, then pick a chip — *Check availability*, *Room service*,
-*Things to do nearby* — or type your own question. The agent replies in
+bottom-right, then pick a chip - *Check availability*, *Room service*,
+*Things to do nearby* - or type your own question. The agent replies in
 the panel.
 
 <details>
@@ -90,7 +90,7 @@ One line. One request in, one response out.
 In between, the model was called at least twice, decided on its own to
 invoke `check_room_availability` twice with arguments it chose, and spent
 tokens you are paying for. None of that is visible. If the answer had been
-wrong, there is nothing here to tell you *where* it went wrong — only that
+wrong, there is nothing here to tell you *where* it went wrong - only that
 a 200 was returned.
 
 That is the gap module 02 closes. But first the agent has to live
@@ -114,11 +114,11 @@ Five things, and the next four modules take them in order:
 
 | Missing | Module |
 |---|---|
-| Anywhere to run but this machine | 01 — Build & Deploy |
-| Any view of what happened inside a request | 02 — Observability |
-| Any measure of whether the answers are good | 03 — Evaluation |
-| Any of the above for agents you did not build | 04 — External Agents |
+| Anywhere to run but this machine | 01 - Build & Deploy |
+| Any view of what happened inside a request | 02 - Observability |
+| Any measure of whether the answers are good | 03 - Evaluation |
+| Any of the above for agents you did not build | 04 - External Agents |
 
 ---
 
-Next: [Module 01 — Build & Deploy](../01-build-deploy/README.md)
+Next: [Module 01 - Build & Deploy](../01-build-deploy/README.md)

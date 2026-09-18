@@ -71,7 +71,7 @@ def get_local_recommendations(category: str) -> dict[str, Any]:
 
     The description the model actually reads is built below, from
     RECOMMENDATION_CATEGORY_DOC. The text of the error this returns is
-    controlled by TOOL_ERRORS — see the notes on both.
+    controlled by TOOL_ERRORS - see the notes on both.
     """
     if not isinstance(category, str) or category not in RECOMMENDATIONS:
         return {"error": _category_error()}
@@ -84,7 +84,7 @@ def get_local_recommendations(category: str) -> dict[str, Any]:
 
 # A tool's description is the only thing telling the model what the tool will
 # accept, so how you maintain it matters. TOOL_DOCS picks between the two ways
-# this one can be maintained, and it is read at startup — so switching is a
+# this one can be maintained, and it is read at startup - so switching is a
 # configuration change, with no rebuild:
 #
 #   handwritten (the default)
@@ -116,7 +116,7 @@ def _category_list() -> str:
 #
 #   helpful
 #       The refusal names the categories that do exist, which is usually
-#       enough for the model to correct itself and retry — at the cost of an
+#       enough for the model to correct itself and retry - at the cost of an
 #       extra round trip it should not have needed.
 #
 # Compare check_room_availability above, which always names its valid values.

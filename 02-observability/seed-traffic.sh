@@ -6,12 +6,12 @@
 # The prompts are chosen to produce *different trace shapes*, not just
 # volume:
 #
-#   1. answered from the system prompt  — no tool call at all     (8 spans)
+#   1. answered from the system prompt  - no tool call at all     (8 spans)
 #   2. one tool call                                               (16 spans)
 #   3. the same tool twice, from one model turn                    (18 spans)
 #   4. a different tool                                            (16 spans)
 #   5. two *different* tools in one request                        (18 spans)
-#   6. two turns in one session           — watch the input tokens grow
+#   6. two turns in one session           - watch the input tokens grow
 #
 # Span counts are from a real run and are worth knowing: the count tells
 # you what the agent decided to do. 8 means it answered without a tool.
@@ -23,8 +23,8 @@
 #
 set -euo pipefail
 
-: "${AGENT_URL:?set AGENT_URL — see module 01, step 3}"
-: "${AGENT_KEY:?set AGENT_KEY — see module 01, step 4}"
+: "${AGENT_URL:?set AGENT_URL - see module 01, step 3}"
+: "${AGENT_KEY:?set AGENT_KEY - see module 01, step 4}"
 
 ask() {
   local label="$1" session="$2" message="$3"
@@ -57,7 +57,7 @@ ask "4/6  a different tool"    "lab-obs-4" \
     "What is on the room service menu for vegetarians?"
 
 ask "5/6  two different tools" "lab-obs-5" \
-    "We are staying in tonight — what can we order to the room, and what is worth doing nearby tomorrow outdoors?"
+    "We are staying in tonight - what can we order to the room, and what is worth doing nearby tomorrow outdoors?"
 
 ask "6/6a multi-turn"          "lab-obs-6" \
     "What does a deluxe room cost?"

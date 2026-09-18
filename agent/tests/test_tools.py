@@ -1,7 +1,7 @@
 """Unit tests for the three concierge tools.
 
 These pass even when the system prompt is broken, the agent hallucinates,
-or governance is misconfigured. They cover deterministic tool logic only —
+or governance is misconfigured. They cover deterministic tool logic only -
 which is exactly the gap module 03 (evaluation) addresses.
 """
 

@@ -4,14 +4,14 @@
 # rule-based evaluators configured properly.
 #
 # The console is the normal way to do this, and it is what module 03 walks
-# through — it handles LLM-as-Judge credentials for you. This script exists
+# through - it handles LLM-as-Judge credentials for you. This script exists
 # for the other case: when you want the same monitor, identically, every
 # time. Put it in CI after a deploy and every release gets evaluated the
 # same way.
 #
 # It uses rule-based evaluators so that it needs no LLM credentials and can
 # run anywhere without a secret to inject. That is a property of this
-# script, not a rule about where judges belong — add judges and their
+# script, not a rule about where judges belong - add judges and their
 # provider configuration whenever you want them, in either monitor type.
 #
 # To add one, put the provider alongside the evaluators in the body:
@@ -35,7 +35,7 @@ NAME="${NAME:-lab-quality-check}"
 
 command -v jq >/dev/null || { echo "jq is required"; exit 1; }
 
-# The window must be entirely in the past — traceEnd in the future is rejected.
+# The window must be entirely in the past - traceEnd in the future is rejected.
 if date -u -v-1H >/dev/null 2>&1; then          # BSD date (macOS)
   START=$(date -u -v-"${HOURS}"H +%Y-%m-%dT%H:%M:%SZ)
   END=$(date -u -v-2M +%Y-%m-%dT%H:%M:%SZ)
@@ -71,7 +71,7 @@ BODY=$(jq -n \
       pick("Latency Performance"; { max_latency_ms: 5000 }),
 
       # Content Safety skips unless it has something to look for. Give it
-      # real values at creation time — an evaluator that skips every trace
+      # real values at creation time - an evaluator that skips every trace
       # contributes nothing to the score and is easy to mistake for a pass.
       pick("Content Safety"; {
         case_sensitive: false,
@@ -82,7 +82,7 @@ BODY=$(jq -n \
 
 echo "$BODY" | amctl api --project "$PROJECT" \
   "/orgs/{org}/projects/{project}/agents/$AGENT/monitors" --input - \
-  | jq -r '"Created monitor \(.name) — run \(.latestRun.status // "queued")"'
+  | jq -r '"Created monitor \(.name) - run \(.latestRun.status // "queued")"'
 
 cat <<NEXT
 
