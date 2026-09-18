@@ -1,0 +1,9 @@
+# Pinned, not floating. The AMP instrumentation matrix pins a Traceloop SDK
+# version per amp-instrumentation release, and CrewAI moves fast — a build
+# that resolves "whatever is current" is a build that breaks on demo day.
+crewai==1.15.22
+amp-instrumentation==0.4.1
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
