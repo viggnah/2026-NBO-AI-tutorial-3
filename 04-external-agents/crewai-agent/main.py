@@ -1,6 +1,6 @@
 """Entry point.
 
-Run it instrumented — that is the whole of module 04's wiring:
+Run it instrumented - that is the whole of module 04's wiring:
 
     amp-instrument python main.py
 

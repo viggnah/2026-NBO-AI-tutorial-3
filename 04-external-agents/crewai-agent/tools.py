@@ -1,7 +1,7 @@
 """Hotel concierge tools, bound to CrewAI.
 
 The hotel data is not copied. It is imported from ``agent/hotel_data.py``
-— the same module the platform-hosted agent reads — so the two agents are
+- the same module the platform-hosted agent reads - so the two agents are
 answering from one source of truth and any difference between them is the
 framework, not the data.
 

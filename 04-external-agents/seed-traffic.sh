@@ -4,7 +4,7 @@
 # this time to the CrewAI agent running on your own machine.
 #
 # The prompts are deliberately identical. Two agents, two frameworks, two
-# places to run, one set of questions — which is what makes the evaluation
+# places to run, one set of questions - which is what makes the evaluation
 # step at the end of the module a fair comparison rather than an anecdote.
 #
 # Unlike module 02 there is no gateway and no API key: this agent is not
@@ -56,7 +56,7 @@ ask "4/7  a different tool"    "ext-4" \
     "What is on the room service menu for vegetarians?"
 
 ask "5/7  two different tools" "ext-5" \
-    "We are staying in tonight — what can we order to the room, and what is worth doing nearby tomorrow outdoors?"
+    "We are staying in tonight - what can we order to the room, and what is worth doing nearby tomorrow outdoors?"
 
 ask "6/7  multi-turn"          "ext-6" \
     "What does a deluxe room cost?"

@@ -1,4 +1,4 @@
-"""Hotel concierge agent on CrewAI — FastAPI service exposing POST /chat.
+"""Hotel concierge agent on CrewAI - FastAPI service exposing POST /chat.
 
 Same hotel, same house style, same three tools, same HTTP contract as the
 LangGraph agent in ``agent/``. Two things differ, and they are the point of
@@ -8,7 +8,7 @@ module 04:
 - nobody built or deployed this. It runs wherever you start it.
 
 There is no Agent Manager SDK here, and no tracing code. Instrumentation is
-applied at launch by ``amp-instrument`` — see this module's README.
+applied at launch by ``amp-instrument`` - see this module's README.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ if not os.access(os.path.expanduser("~"), os.W_OK):
     os.environ["HOME"] = os.path.join(os.sep, "tmp")
 
 # CrewAI exports its own anonymous telemetry to telemetry.crewai.com. Turn it
-# off — it has nothing to do with Agent Manager. Do *not* reach for
+# off - it has nothing to do with Agent Manager. Do *not* reach for
 # OTEL_SDK_DISABLED here: CrewAI honours it, but so does the exporter that
 # sends traces to Agent Manager, and you would silently lose both.
 os.environ.setdefault("CREWAI_DISABLE_TELEMETRY", "true")
@@ -45,19 +45,19 @@ log = logging.getLogger("concierge")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 
 # Optional. Set it to talk to anything that speaks the OpenAI API instead of
-# OpenAI itself — Groq, vLLM, an Agent Manager LLM Service Provider. Leave it
+# OpenAI itself - Groq, vLLM, an Agent Manager LLM Service Provider. Leave it
 # unset for OpenAI.
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL") or None
 
 # CrewAI resolves the provider from the part of the model name before the
 # first slash. Everything here speaks the OpenAI API, so the provider is
-# always "openai" and the rest of the name is passed through untouched —
+# always "openai" and the rest of the name is passed through untouched -
 # which matters for a model whose own id contains a slash, as Groq's
 # openai/gpt-oss-120b does. Set OPENAI_MODEL to the id the provider
 # publishes and let this line qualify it.
 LLM_MODEL = f"openai/{OPENAI_MODEL}"
 
-# Conversation state, in memory, keyed by session_id — as in the
+# Conversation state, in memory, keyed by session_id - as in the
 # platform-hosted agent. Stored as (guest, concierge) pairs.
 SESSIONS: dict[str, list[tuple[str, str]]] = {}
 

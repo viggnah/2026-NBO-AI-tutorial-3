@@ -1,4 +1,4 @@
-# Module 04 — External Agents: governed without being run
+# Module 04 - External Agents: governed without being run
 
 **Duration:** 20 min
 
@@ -6,7 +6,7 @@ Modules 01 through 03 all rested on one assumption: Agent Manager built the
 agent, so Agent Manager could instrument it. That assumption is the
 exception in a real estate, not the rule. Most agents an organisation ends
 up governing were written by another team, on another framework, running in
-another account — and some of them belong to a vendor.
+another account - and some of them belong to a vendor.
 
 This module takes an agent the platform has never seen, and gets back the
 two things modules 02 and 03 were about: a trace per request, and a score
@@ -61,9 +61,9 @@ The trade is on the other side: because there is no gateway in front of
 this agent, the API-key authentication module 01 got for free is yours to
 provide.
 
-## Step 1 — Run it, unwatched
+## Step 1 - Run it, unwatched
 
-Get the agent working before adding anything to it — the same order module
+Get the agent working before adding anything to it - the same order module
 00 used.
 
 ```bash
@@ -73,7 +73,7 @@ python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# Edit .env — paste your OPENAI_API_KEY
+# Edit .env - paste your OPENAI_API_KEY
 set -a; source .env; set +a
 
 python main.py
@@ -85,7 +85,7 @@ python main.py
 > instrumentation is published for 3.10 through 3.13.
 
 > **Any OpenAI-compatible endpoint works.** Set `OPENAI_BASE_URL` and point
-> `OPENAI_MODEL` at whatever that provider calls the model — Groq, vLLM, or
+> `OPENAI_MODEL` at whatever that provider calls the model - Groq, vLLM, or
 > an Agent Manager LLM Service Provider. Nothing else changes, and the
 > traces are the same shape, because the spans come from the OpenAI SDK
 > rather than from OpenAI:
@@ -104,10 +104,10 @@ curl -s -X POST http://localhost:8000/chat \
        "session_id":"ext-smoke","context":{}}' | jq -r .response
 ```
 
-A working agent, invisible to everything — which is exactly where module 00
+A working agent, invisible to everything - which is exactly where module 00
 started, and the state most agents in an organisation are actually in.
 
-## Step 2 — Register it
+## Step 2 - Register it
 
 In the console, open a project and click **Add Agent**. This time take
 **Externally-Hosted Agent** rather than Platform-Hosted.
@@ -131,13 +131,13 @@ Registration creates a record to hang observability and governance on.
 
 Click **Register**. The **Setup Agent** panel opens on its own.
 
-## Step 3 — Take the endpoint and the key
+## Step 3 - Take the endpoint and the key
 
 The Setup Agent panel carries the two values the agent needs. Pick a
 **Token Duration** and click **Generate**.
 
 **Copy the key immediately.** It is shown once. If you lose it, generate
-another — the old one keeps working until you do.
+another - the old one keeps working until you do.
 
 ```bash
 export AMP_OTEL_ENDPOINT="..."   # from the panel
@@ -154,10 +154,10 @@ export AMP_AGENT_API_KEY="..."   # from the panel
 > be surprised that the value does not change per environment. On a
 > self-managed install it is that environment's gateway.
 
-The endpoint works with or without a trailing `/v1/traces` — the signal
+The endpoint works with or without a trailing `/v1/traces` - the signal
 path is appended only when it is missing.
 
-## Step 4 — Run it instrumented
+## Step 4 - Run it instrumented
 
 The package is already in `requirements.txt`, so it is installed. All that
 changes is how the process starts:
@@ -167,7 +167,7 @@ amp-instrument python main.py
 ```
 
 That is the entire integration. No import, no decorator, no initialisation
-call, no SDK in the code — `agent.py` has no idea any of this is happening.
+call, no SDK in the code - `agent.py` has no idea any of this is happening.
 Look for this line in the output:
 
 ```
@@ -176,7 +176,7 @@ Traceloop exporting traces to https://...  authenticating with custom headers
 
 > **This is not the init container from module 02.** Module 02's agent got
 > its instrumentation from an init container AMP injects into the pod at
-> deploy time — which needs a pod, so it exists only on the platform-hosted
+> deploy time - which needs a pod, so it exists only on the platform-hosted
 > path. Here there is no pod, so you install the same thing yourself:
 >
 > | | Platform-hosted (02) | Externally-hosted (04) |
@@ -188,12 +188,12 @@ Traceloop exporting traces to https://...  authenticating with custom headers
 > Two delivery mechanisms, one payload. The PyPI package and the
 > init-container image share a single version number, so
 > `amp-instrumentation==0.4.1` here and instrumentation version `0.4.1`
-> there install the same pinned Traceloop SDK — which is why the spans come
+> there install the same pinned Traceloop SDK - which is why the spans come
 > out the same shape whichever way the agent is run.
 
 > **Instrumentation fails open, and that is the trap in this step.** If the
 > two variables are unset you get `ERROR: Failed to initialize WSO2 AMP
-> instrumentation` — and then the agent starts anyway and serves perfectly
+> instrumentation` - and then the agent starts anyway and serves perfectly
 > well, untraced. If the key is wrong you get `Failed to export span batch
 > code: 401, reason: Unauthorized`, and again the agent keeps answering.
 > Both go to stderr and neither is fatal. An agent that looks healthy is
@@ -203,16 +203,16 @@ Traceloop exporting traces to https://...  authenticating with custom headers
 > gives a batch ten seconds and then drops it with
 > `Failed to export span batch code: None, reason: ... Read timed out`. The
 > agent does not notice, and the trace simply never appears.
-> `OTEL_EXPORTER_OTLP_TIMEOUT=30` — standard OpenTelemetry, seconds — is in
+> `OTEL_EXPORTER_OTLP_TIMEOUT=30` - standard OpenTelemetry, seconds - is in
 > `.env.example` for that reason.
 
-## Step 5 — Send traffic
+## Step 5 - Send traffic
 
 ```bash
 ./seed-traffic.sh
 ```
 
-Seven requests across six sessions — **the same seven prompts module 02
+Seven requests across six sessions - **the same seven prompts module 02
 sent to the platform-hosted agent.** They are identical on purpose. Two
 agents, two frameworks, two places to run, one set of questions makes step
 7 a comparison rather than an anecdote.
@@ -220,12 +220,12 @@ agents, two frameworks, two places to run, one set of questions makes step
 No `AGENT_KEY` this time. There is no gateway in front of this agent, so
 you are calling it directly.
 
-## Step 6 — Read the trace, and find what is not a span
+## Step 6 - Read the trace, and find what is not a span
 
 Console → the agent → **OBSERVABILITY → Traces**. The same view module 02
 used, for an agent the platform never built.
 
-> If the list is empty, check the time range first — as in module 02, the
+> If the list is empty, check the time range first - as in module 02, the
 > picker opens on a short window. Spans are batched, so allow a few seconds.
 
 Open the comparison request. A crew is not a graph, so the tree is shaped
@@ -233,7 +233,7 @@ differently from module 02's. Six spans, from two different instrumentors:
 
 | Span | Emitted by | Carries |
 |---|---|---|
-| `crewai.workflow` | CrewAI | the root — crew config, result, token usage |
+| `crewai.workflow` | CrewAI | the root - crew config, result, token usage |
 | `<the task description>.task` | CrewAI | task description, expected output, output |
 | `<the agent's role>.agent` | CrewAI | role, goal, backstory, the tool list |
 | `openai.chat` ×3 | OpenAI SDK | messages, tokens, finish reason, tool definitions |
@@ -246,8 +246,8 @@ Zero-code coverage is the union of whatever recognised libraries your agent
 happens to call, not a single framework integration.
 
 Two of module 02's three questions are answered here exactly as they were
-there. **Where did the time go** — the three `openai.chat` spans account
-for most of the 2.4 seconds. **What did it cost** — read the tokens across
+there. **Where did the time go** - the three `openai.chat` spans account
+for most of the 2.4 seconds. **What did it cost** - read the tokens across
 the three calls of one request:
 
 | Model call | Input tokens | Finish reason |
@@ -280,7 +280,7 @@ role=assistant   tool_call            check_room_availability {"nights":3,"room_
 role=tool        tool_call_response   {"total_usd": 3600, ...}
 ```
 
-Module 02's third question — **why did it say that** — is answerable after
+Module 02's third question - **why did it say that** - is answerable after
 all. The guest wrote *"Compare a junior suite and the presidential suite
 for a 3-night stay"*; nothing in that sentence is `room_type` or `nights`,
 and the model extracted both, twice. That is the same finding module 02
@@ -291,19 +291,19 @@ So the distinction is sharper than "traced" versus "untraced":
 
 | | Platform-hosted (LangGraph) | Here (CrewAI) |
 |---|---|---|
-| Tool arguments and results recorded | ✅ | ✅ — inside the LLM messages |
+| Tool arguments and results recorded | ✅ | ✅ - inside the LLM messages |
 | A span per tool call | ✅ | ❌ |
 | Per-tool duration | ✅ | ❌ |
 | Tool-level filters and evaluators bind to it | ✅ | ❌ |
 
 The data is there; it is not **first-class**. A tool that fails will not
 raise the error badge, will not be found by `--condition tool_call_fails`,
-and will not be scored by an evaluator that reads tool spans — because
+and will not be scored by an evaluator that reads tool spans - because
 there is no span carrying its name and status. Finding it means reading a
 message array by hand, which is fine once and useless at scale.
 
 That is the gap worth closing, and closing it is roughly fifteen lines
-against the span contract Agent Manager publishes — see
+against the span contract Agent Manager publishes - see
 [Going further](#going-further). The general lesson transfers past this
 lab: **check the instrumentation catalogue against your own framework
 before assuming coverage**, because the failure mode is not an empty trace.
@@ -311,12 +311,12 @@ It is a trace that looks complete until you go looking for the one span you
 wanted to filter on.
 
 > **The task span is named after the task description**, which contains the
-> guest's message — so guest utterances appear as span names in the trace
+> guest's message - so guest utterances appear as span names in the trace
 > list. Convenient here, worth a thought before pointing this at real
 > traffic.
 
 
-## Step 7 — Score it with module 03's standards
+## Step 7 - Score it with module 03's standards
 
 Evaluation reads stored traces. It never touched the agent in module 03,
 and it does not know or care that this one runs somewhere else. So the
@@ -324,14 +324,14 @@ monitor you already know how to build works here unchanged.
 
 1. Open this agent and click the **Evaluation** tab.
 2. **Add Monitor**, **Past Traces**, window covering step 5.
-3. Add the evaluators from module 03 — `Length Compliance`,
-   `Latency Performance`, `Content Safety`, `Completeness`, `Tone` — with
+3. Add the evaluators from module 03 - `Length Compliance`,
+   `Latency Performance`, `Content Safety`, `Completeness`, `Tone` - with
    the same settings. Judges need their LLM credentials configured on this
    monitor.
 4. **Create Monitor.**
 
 Then open module 03's monitor on the platform-hosted agent beside this one.
-Same prompts, same evaluators, same scale — one radar chart per framework.
+Same prompts, same evaluators, same scale - one radar chart per framework.
 
 That comparison is the point of the module. The agent nobody here built,
 that nobody here deployed, that runs on a laptop, is being held to the
@@ -340,7 +340,7 @@ the same dashboard, as the agent the platform operates.
 
 > **Read the skipped count before reading the scores.** Evaluators need
 > particular attributes, and they report **skipped** rather than guessing
-> when those are absent — the honest result, and easy to mistake for a good
+> when those are absent - the honest result, and easy to mistake for a good
 > one. The count is on the **Evaluation Summary**.
 >
 > For this agent the two levels are not equally well served, and step 6's
@@ -357,7 +357,7 @@ the same dashboard, as the agent the platform operates.
 > data exists, but an evaluator can only read the attributes it was written
 > to read.
 
-## Step 8 — What you give up
+## Step 8 - What you give up
 
 Registering an external agent is not a way to get platform hosting for
 free, and being straight about the trade is part of presenting it:
@@ -375,14 +375,14 @@ free, and being straight about the trade is part of presenting it:
 
 That last row catches people. The runtime-observability subcommands work
 against platform-managed agents only and fail up front with an explicit
-error for an external one. The traces exist and the console shows them —
+error for an external one. The traces exist and the console shows them -
 it is the CLI's runtime commands that do not apply, because there is no
 workload here for the platform to read from.
 
 The shape of the deal: **the platform governs what it does not operate.**
 Observability and evaluation follow the agent's *record*, not its runtime.
 
-## Step 9 — The platform, from an agent's side of the desk
+## Step 9 - The platform, from an agent's side of the desk
 
 One more thing, and it is about the platform rather than about the agent.
 Everything in this lab has been a person driving a console or a CLI. The
@@ -397,7 +397,7 @@ amctl skills list
 amctl skills install
 ```
 
-This works with **no instance and no login** — the bundle is fetched from
+This works with **no instance and no login** - the bundle is fetched from
 [`wso2/agent-skills`](https://github.com/wso2/agent-skills), extracted to
 `~/.agents/skills/`, and linked into whichever assistants are installed
 locally (Claude Code, Cursor, Windsurf). Nothing about it depends on
@@ -407,7 +407,7 @@ What arrives is written guidance, not a plugin: the verb map, the rules
 that stop calls failing silently, a `troubleshooting.md` of the CLI's sharp
 edges and a `triage.md` that walks build → logs → metrics → traces in
 order. Module 01 installed it; module 02 used it. It is worth naming what
-that means — the platform treats a coding assistant as a first-class
+that means - the platform treats a coding assistant as a first-class
 operator of itself, which is the same claim this module has been making
 about agents, pointed inward.
 
@@ -439,23 +439,23 @@ except step 9, and step 9 does not need a login.
 
 | Module | What it added | Needed the platform to run the agent? |
 |---|---|---|
-| 00 | A working agent | — |
+| 00 | A working agent | - |
 | 01 | Somewhere to run it | yes |
 | 02 | A record of what happened inside a request | yes |
-| 03 | A score for whether it was any good | no — it reads traces |
+| 03 | A score for whether it was any good | no - it reads traces |
 | 04 | The same two, for an agent run elsewhere | **no** |
 
 The through-line is in the last column. Build and deploy are a service the
 platform offers. Observability and evaluation are the governance it
-applies — and those two follow the agent, not the hosting.
+applies - and those two follow the agent, not the hosting.
 
 ## Going further
 
-- [Internal and External Agents](https://wso2.github.io/agent-manager/docs/) — what the type fixes at registration, and why it cannot be changed afterwards
-- [AMP Instrumentation](https://wso2.github.io/agent-manager/docs/) — the `amp-instrument` wrapper, the framework catalogue with its tested versions and known limitations, and the **manual instrumentation contract**: the OTLP endpoint, the `x-amp-api-key` header, and the `gen_ai.*` attribute table a hand-written tool span needs. This is what closes step 6's gap.
-- [Retrieve AgentID Credentials for an Externally-Hosted Agent](https://wso2.github.io/agent-manager/docs/) — per-environment `client_id`/`client_secret` for an agent the platform cannot inject into. Provisioning starts at registration rather than at deploy, since there is no deploy.
-- [Sample agents](https://github.com/wso2/agent-manager/tree/main/samples) — seven runnable agents across LangGraph, CrewAI, LangChain, Strands, .NET and plain Python. `manual-instrumentation-agent` is the executable reference for the contract above; `dotnet-agent` is the external path in a language the platform does not auto-instrument at all.
+- [Internal and External Agents](https://wso2.github.io/agent-manager/docs/) - what the type fixes at registration, and why it cannot be changed afterwards
+- [AMP Instrumentation](https://wso2.github.io/agent-manager/docs/) - the `amp-instrument` wrapper, the framework catalogue with its tested versions and known limitations, and the **manual instrumentation contract**: the OTLP endpoint, the `x-amp-api-key` header, and the `gen_ai.*` attribute table a hand-written tool span needs. This is what closes step 6's gap.
+- [Retrieve AgentID Credentials for an Externally-Hosted Agent](https://wso2.github.io/agent-manager/docs/) - per-environment `client_id`/`client_secret` for an agent the platform cannot inject into. Provisioning starts at registration rather than at deploy, since there is no deploy.
+- [Sample agents](https://github.com/wso2/agent-manager/tree/main/samples) - seven runnable agents across LangGraph, CrewAI, LangChain, Strands, .NET and plain Python. `manual-instrumentation-agent` is the executable reference for the contract above; `dotnet-agent` is the external path in a language the platform does not auto-instrument at all.
 
 ---
 
-Previous: [Module 03 — Evaluation](../03-evaluation/README.md)
+Previous: [Module 03 - Evaluation](../03-evaluation/README.md)

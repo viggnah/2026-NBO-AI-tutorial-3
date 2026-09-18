@@ -3,7 +3,7 @@
 Module 04's whole claim is that this is the *same* concierge running
 somewhere else. Copying the room rates and the system prompt into this
 folder would quietly make that untrue the first time either one changed,
-so they are imported from ``agent/`` instead — two directories up, the
+so they are imported from ``agent/`` instead - two directories up, the
 same files module 00 ran on a laptop and module 01 deployed.
 
 The path is resolved from this file rather than the working directory, so
