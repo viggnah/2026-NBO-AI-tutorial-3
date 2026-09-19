@@ -9,7 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
-  // Same palette as agent/web/index.html, so this reads as the same hotel.
+  // The palette and type are module 00's, unchanged, so this reads as the
+  // same hotel rather than a second one.
   tailwind.config = { theme: { extend: {
     colors: { navy:'#1B2B4B', gold:'#C9A84C', ink:'#1a1a1a', line:'#E6E2D6',
               sand:'#FBFAF6', muted:'#6b6b6b', block:'#B23B3B', pass:'#3F7A52' },
@@ -17,134 +18,188 @@
   } } };
 </script>
 <style>
-  body { font-family:'Inter',sans-serif; color:#1a1a1a; background:#FBFAF6; }
+  body { font-family:'Inter',sans-serif; color:#1a1a1a; background:#fff; }
   .serif { font-family:'Playfair Display',serif; }
+
+  /* Local image rather than module 00's Unsplash URLs: a conference network
+     that blocks or throttles a CDN should not cost you the hero shot. */
   .hero { background:
-      linear-gradient(180deg, rgba(27,43,75,.30) 0%, rgba(27,43,75,.55) 60%, rgba(27,43,75,.88) 100%),
+      linear-gradient(180deg, rgba(27,43,75,.35) 0%, rgba(27,43,75,.45) 50%, rgba(27,43,75,.85) 100%),
       url('hotel-bg.jpg') center/cover no-repeat; }
+
+  /* The backdrop behind the expanded chat. Two faint gold motifs on the sand
+     ground: a diagonal weave and a dot grid. Pure CSS, so nothing to load. */
+  .pattern {
+    background-color:#FBFAF6;
+    background-image:
+      repeating-linear-gradient(45deg,  rgba(201,168,76,.07) 0 2px, transparent 2px 22px),
+      repeating-linear-gradient(-45deg, rgba(201,168,76,.07) 0 2px, transparent 2px 22px),
+      radial-gradient(rgba(27,43,75,.06) 1.5px, transparent 1.5px);
+    background-size:auto, auto, 26px 26px;
+  }
   .thread { scrollbar-width:thin; }
   .bubble-guest { background:#1B2B4B; color:#fff; }
   .bubble-agent { background:#fff; border:1px solid #E6E2D6; }
-  .dot { width:6px;height:6px;border-radius:50%;background:#C9A84C;display:inline-block;
-         animation:b 1.2s infinite ease-in-out; }
+  .dot { width:6px;height:6px;border-radius:50%;background:#C9A84C;display:inline-block;animation:b 1.2s infinite }
   .dot:nth-child(2){animation-delay:.15s}.dot:nth-child(3){animation-delay:.3s}
   @keyframes b {0%,80%,100%{opacity:.25}40%{opacity:1}}
+  #stage { display:none; }
+  #stage.on { display:flex; }
 </style>
 </head>
-<body>
+<body class="bg-white">
+
+<!-- TOP BAR -->
+<header class="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-12 py-6 text-white">
+  <div class="serif text-[22px] font-semibold tracking-wide">The Grand <span class="text-gold">Meridian</span></div>
+  <nav class="hidden md:flex gap-8 text-sm font-medium tracking-wide">
+    <a href="#rooms" class="opacity-90 hover:opacity-100">Rooms</a>
+    <a href="#" class="opacity-90 hover:opacity-100">Dining</a>
+    <a href="#" class="opacity-90 hover:opacity-100">Spa</a>
+    <a href="#" class="opacity-90 hover:opacity-100">Contact</a>
+  </nav>
+</header>
 
 <!-- HERO -->
-<section class="hero relative h-[38vh] min-h-[260px] flex flex-col justify-between">
-  <header class="flex items-center justify-between px-8 py-5 text-white">
-    <div class="serif text-[21px] font-semibold tracking-wide">The Grand <span class="text-gold">Meridian</span></div>
-    <nav class="hidden md:flex gap-7 text-sm opacity-90">
-      <span>Rooms</span><span>Dining</span><span>Spa</span><span>Contact</span>
-    </nav>
-  </header>
-  <div class="px-8 pb-7 text-white">
-    <p class="uppercase tracking-[0.2em] text-[11px] text-gold mb-2">Externally-hosted agent - governed by WSO2 Agent Manager</p>
-    <h1 class="serif text-[34px] leading-tight font-semibold">Concierge</h1>
-  </div>
-</section>
-
-<!-- CONTROL STRIP -->
-<section class="border-b border-line bg-white">
-  <div class="px-8 py-3 flex flex-wrap items-center gap-3 text-sm">
-    <label class="text-muted">Agent</label>
-    <input id="url" class="border border-line rounded px-2 py-1 w-[290px] font-mono text-[12px]"
-           value="http://localhost:8000/chat">
-    <label class="flex items-center gap-2 ml-2 cursor-pointer">
-      <input id="cmp" type="checkbox" class="accent-navy"><span class="text-muted">Compare with a second endpoint</span>
-    </label>
-    <input id="url2" class="border border-line rounded px-2 py-1 w-[290px] font-mono text-[12px] hidden"
-           placeholder="http://localhost:8001/chat">
-    <button id="reset" class="ml-auto text-muted hover:text-ink underline underline-offset-2">New session</button>
-  </div>
-</section>
-
-<!-- MAIN -->
-<main class="px-8 py-6 grid gap-6" style="grid-template-columns:minmax(0,1fr) 380px;">
-
-  <!-- CHAT -->
-  <section>
-    <div id="cols" class="grid gap-4" style="grid-template-columns:1fr;">
-      <div class="border border-line rounded-lg bg-sand flex flex-col" style="height:52vh;min-height:360px;">
-        <div class="px-4 py-2 border-b border-line text-[12px] uppercase tracking-wider text-muted bg-white rounded-t-lg">
-          <span id="lab1">Concierge</span>
-        </div>
-        <div id="t1" class="thread flex-1 overflow-y-auto p-4 space-y-3"></div>
-      </div>
-      <div id="pane2" class="border border-line rounded-lg bg-sand flex-col hidden" style="height:52vh;min-height:360px;">
-        <div class="px-4 py-2 border-b border-line text-[12px] uppercase tracking-wider text-muted bg-white rounded-t-lg">
-          <span id="lab2">Second endpoint</span>
-        </div>
-        <div id="t2" class="thread flex-1 overflow-y-auto p-4 space-y-3"></div>
-      </div>
-    </div>
-
-    <!-- SCENARIO CHIPS -->
-    <div class="mt-4 flex flex-wrap gap-2" id="chips"></div>
-
-    <!-- INPUT -->
-    <div class="mt-3 flex gap-2">
-      <input id="msg" class="flex-1 border border-line rounded px-3 py-2 bg-white"
-             placeholder="Ask the concierge...">
-      <button id="send" class="bg-navy text-white px-5 py-2 rounded hover:opacity-90">Send</button>
-    </div>
-  </section>
-
-  <!-- POLICY RAIL -->
-  <aside>
-    <div class="border border-line rounded-lg bg-white">
-      <div class="px-4 py-2 border-b border-line text-[12px] uppercase tracking-wider text-muted">
-        Gateway - what the platform did
-      </div>
-      <div id="rail" class="p-4 space-y-3 overflow-y-auto" style="max-height:60vh;">
-        <p class="text-muted text-sm">Nothing yet. Every request the agent makes to the model
-        passes through Agent Manager's gateway; anything a policy does to it shows up here.</p>
-      </div>
-    </div>
-    <p class="text-[12px] text-muted mt-3 leading-relaxed">
-      The agent holds no model credential. It calls the gateway, and the gateway holds the key,
-      applies the policies and forwards the call.
+<section class="hero relative min-h-[560px] h-[74vh]">
+  <div class="absolute left-12 right-12 bottom-20 max-w-[700px] text-white">
+    <div class="text-[12px] tracking-[0.24em] uppercase text-gold mb-4">Est. 1924 · Downtown</div>
+    <h1 class="serif font-bold text-[60px] leading-[1.05] tracking-tight mb-4">
+      Where every stay<br>becomes a story.
+    </h1>
+    <p class="text-lg leading-relaxed text-gray-200 mb-8 max-w-[520px]">
+      A landmark hotel, reimagined for the modern traveler. Suites overlooking
+      the harbor, a Michelin-recognized kitchen, and a concierge that never sleeps.
     </p>
-    <div class="border border-line rounded-lg bg-white mt-3 p-4 text-[12px] leading-relaxed text-muted">
-      <div class="uppercase tracking-wider text-[11px] mb-1 text-ink">Why masking is not shown here</div>
-      A blocked response comes back to the agent, so this page can report it. PII masking is
-      different: the gateway rewrites the request on its way to the model, and the agent never
-      sees the substitution. Nothing reaches this page to display. To see it, ask the model
-      directly through the gateway - the README has the call, and the model answers
-      <span class="font-mono text-ink">*****</span>.
+    <button id="open"
+      class="inline-flex items-center gap-3 bg-gold text-navy px-7 py-4 text-sm font-semibold tracking-wider uppercase hover:bg-yellow-500 transition shadow-lg">
+      Ask the Concierge <span aria-hidden="true">→</span>
+    </button>
+    <button class="inline-flex items-center gap-2 bg-transparent text-white border border-white/40 px-6 py-4 text-sm font-medium tracking-wider uppercase ml-3 hover:bg-white/10 transition">
+      Explore Rooms
+    </button>
+  </div>
+</section>
+
+<!-- ROOMS -->
+<section id="rooms" class="max-w-[1200px] mx-auto px-12 py-20">
+  <div class="text-[11px] tracking-[0.28em] uppercase text-gold mb-3">Accommodations</div>
+  <h2 class="serif font-semibold text-[40px] leading-tight text-navy mb-3">Rooms &amp; Suites</h2>
+  <p class="text-base text-muted max-w-[580px] mb-12">
+    Twenty-eight rooms and suites, each with original 1920s detailing and a
+    private terrace overlooking the city or the harbor.
+  </p>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-8" id="rooms-grid"></div>
+</section>
+
+<footer class="bg-navy text-white/80 py-10 px-12">
+  <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row items-baseline justify-between gap-4">
+    <div class="serif text-lg font-semibold">The Grand <span class="text-gold">Meridian</span></div>
+    <div class="text-sm">128 Harbor Avenue · Downtown</div>
+    <div class="text-xs tracking-wider uppercase opacity-60">© 2026 The Grand Meridian</div>
+  </div>
+</footer>
+
+<!-- ============ CONCIERGE STAGE (expanded chat) ============ -->
+<div id="stage" class="pattern fixed inset-0 z-40 flex-col">
+  <div class="flex items-center justify-between px-8 py-4 bg-navy text-white shrink-0">
+    <div class="flex items-baseline gap-3">
+      <span class="serif text-[19px] font-semibold">The Grand <span class="text-gold">Meridian</span></span>
+      <span class="text-[11px] uppercase tracking-[0.2em] text-gold/90">Concierge</span>
     </div>
-  </aside>
-</main>
+    <div class="flex items-center gap-3 text-[12px]">
+      <input id="url" class="bg-white/10 border border-white/20 rounded px-2 py-1 w-[260px] font-mono text-[11px] text-white placeholder-white/40"
+             value="http://localhost:8000/chat">
+      <label class="flex items-center gap-1.5 cursor-pointer select-none">
+        <input id="cmp" type="checkbox" class="accent-gold"><span class="opacity-80">Compare</span>
+      </label>
+      <input id="url2" class="bg-white/10 border border-white/20 rounded px-2 py-1 w-[220px] font-mono text-[11px] text-white placeholder-white/40 hidden"
+             placeholder="http://localhost:8001/chat">
+      <button id="reset" class="opacity-80 hover:opacity-100 underline underline-offset-2">New session</button>
+      <button id="close" class="ml-2 text-xl leading-none opacity-80 hover:opacity-100" aria-label="Close">×</button>
+    </div>
+  </div>
+
+  <div class="flex-1 min-h-0 grid gap-6 px-8 py-6" style="grid-template-columns:minmax(0,1fr) 370px;">
+    <section class="flex flex-col min-h-0">
+      <div id="cols" class="grid gap-4 flex-1 min-h-0" style="grid-template-columns:1fr;">
+        <div class="border border-line rounded-lg bg-white/85 backdrop-blur flex flex-col min-h-0 shadow-sm">
+          <div class="px-4 py-2 border-b border-line text-[11px] uppercase tracking-wider text-muted">Concierge</div>
+          <div id="t1" class="thread flex-1 overflow-y-auto p-4 space-y-3"></div>
+        </div>
+        <div id="pane2" class="border border-line rounded-lg bg-white/85 backdrop-blur flex-col min-h-0 hidden shadow-sm">
+          <div class="px-4 py-2 border-b border-line text-[11px] uppercase tracking-wider text-muted">Second endpoint</div>
+          <div id="t2" class="thread flex-1 overflow-y-auto p-4 space-y-3"></div>
+        </div>
+      </div>
+      <div class="mt-3 flex flex-wrap gap-2" id="chips"></div>
+      <div class="mt-3 flex gap-2">
+        <input id="msg" class="flex-1 border border-line rounded px-3 py-2.5 bg-white" placeholder="Ask the concierge...">
+        <button id="send" class="bg-navy text-white px-6 py-2.5 rounded hover:opacity-90">Send</button>
+      </div>
+    </section>
+
+    <aside class="flex flex-col min-h-0">
+      <div class="border border-line rounded-lg bg-white/85 backdrop-blur flex flex-col min-h-0 shadow-sm">
+        <div class="px-4 py-2 border-b border-line text-[11px] uppercase tracking-wider text-muted">
+          Gateway - what the platform did
+        </div>
+        <div id="rail" class="p-4 space-y-3 overflow-y-auto flex-1">
+          <p class="text-muted text-sm">Every model call this agent makes passes through Agent
+          Manager's gateway. Anything a policy does to one shows up here.</p>
+        </div>
+      </div>
+      <div class="border border-line rounded-lg bg-white/70 mt-3 p-3.5 text-[12px] leading-relaxed text-muted shrink-0">
+        <div class="uppercase tracking-wider text-[10px] mb-1 text-ink">Why masking is not shown here</div>
+        A blocked response comes back to the agent, so this page can report it. PII masking is
+        different: the gateway rewrites the request on its way to the model, and the agent never
+        sees the substitution. Ask the model directly through the gateway to see it - the README
+        has the call, and the answer is <span class="font-mono text-ink">*****</span>.
+      </div>
+    </aside>
+  </div>
+</div>
 
 <script>
+const ROOMS = [
+  ["Standard Room", 280, "King bed, marble bath, harbor or courtyard view. 380 sq ft.", "1631049307264-da0ec9d70304"],
+  ["Deluxe Suite", 340, "Separate sitting area, soaking tub, full harbor view. 620 sq ft.", "1611892440504-42a792e24d32"],
+  ["Honeymoon Suite", 420, "Private terrace, fireplace, butler service on request. 940 sq ft.", "1582719508461-905c673771fd"],
+];
+document.getElementById("rooms-grid").innerHTML = ROOMS.map(([n, p, d, img]) => `
+  <article class="flex flex-col">
+    <div class="bg-cover bg-center aspect-[4/5] bg-sand border border-line"
+         style="background-image:url('https://images.unsplash.com/photo-${img}?auto=format&fit=crop&w=1200&q=80')"></div>
+    <div class="flex items-baseline justify-between mt-5 pb-1.5 border-b border-line">
+      <h3 class="serif font-semibold text-[22px] text-navy m-0">${n}</h3>
+      <div class="text-sm font-medium"><span class="text-muted text-[11px] tracking-[0.18em] uppercase mr-1.5">From</span>$${p}/night</div>
+    </div>
+    <p class="mt-3 text-sm leading-relaxed text-muted">${d}</p>
+  </article>`).join("");
+
 const SCENARIOS = [
-  { label: "Normal question", hint: "control - allowed",
-    text: "Compare a junior suite and the presidential suite for a 3-night stay." },
-  { label: "Demand a refund", hint: "response guardrail - blocked",
-    text: "I am unhappy with my stay. Promise me a refund in writing." },
-  { label: "Data handling", hint: "prompt decorator",
-    text: "Do you store my card details anywhere?" },
-  // Masking happens at the gateway, on the way to the model. The agent sends
-  // the card and never sees what was substituted, so there is nothing for
-  // this page to display - see the note in the rail. The proof is a direct
-  // call to the gateway, in the README.
-  { label: "Card number", hint: "PII masking - proof is upstream",
-    text: "My card is 4111 1111 1111 1111. Can you note it on my booking?" },
+  { label: "Normal question", hint: "control", text: "Compare a junior suite and the presidential suite for a 3-night stay." },
+  { label: "Demand a refund", hint: "response guardrail", text: "I am unhappy with my stay. Promise me a refund in writing." },
+  { label: "Data handling", hint: "prompt decorator", text: "Do you store my card details anywhere?" },
+  { label: "Card number", hint: "PII masking - proof is upstream", text: "My card is 4111 1111 1111 1111. Can you note it on my booking?" },
 ];
 
 const $ = (id) => document.getElementById(id);
 let session = "ui-" + Math.random().toString(36).slice(2, 8);
 
 $("chips").innerHTML = SCENARIOS.map((s, i) =>
-  `<button data-i="${i}" class="chip border border-line bg-white rounded-full px-3 py-1.5 text-sm hover:bg-[#F5F2E8]">
+  `<button data-i="${i}" class="chip border border-line bg-white rounded-full px-3 py-1.5 text-sm hover:bg-[#F5F2E8] shadow-sm">
      ${s.label} <span class="text-muted text-[11px]">· ${s.hint}</span></button>`).join("");
 $("chips").addEventListener("click", (e) => {
   const b = e.target.closest(".chip"); if (!b) return;
   $("msg").value = SCENARIOS[+b.dataset.i].text; send();
 });
+
+const openStage  = () => { $("stage").classList.add("on"); document.body.style.overflow = "hidden"; $("msg").focus(); };
+const closeStage = () => { $("stage").classList.remove("on"); document.body.style.overflow = ""; };
+$("open").addEventListener("click", openStage);
+$("close").addEventListener("click", closeStage);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeStage(); });
 
 $("cmp").addEventListener("change", (e) => {
   const on = e.target.checked;
@@ -165,17 +220,16 @@ function bubble(thread, who, text) {
   wrap.className = who === "guest" ? "flex justify-end" : "flex justify-start";
   const b = document.createElement("div");
   b.className = (who === "guest" ? "bubble-guest" : "bubble-agent") +
-    " rounded-lg px-3 py-2 text-[14px] leading-relaxed max-w-[85%] whitespace-pre-wrap";
+    " rounded-lg px-3.5 py-2.5 text-[14px] leading-relaxed max-w-[86%] whitespace-pre-wrap shadow-sm";
   b.textContent = text;
   wrap.appendChild(b); thread.appendChild(wrap);
   thread.scrollTop = thread.scrollHeight;
-  return b;
 }
 
 function thinking(thread) {
   const w = document.createElement("div");
   w.className = "flex justify-start";
-  w.innerHTML = `<div class="bubble-agent rounded-lg px-3 py-2"><span class="dot"></span> <span class="dot"></span> <span class="dot"></span></div>`;
+  w.innerHTML = `<div class="bubble-agent rounded-lg px-3.5 py-2.5"><span class="dot"></span> <span class="dot"></span> <span class="dot"></span></div>`;
   thread.appendChild(w); thread.scrollTop = thread.scrollHeight;
   return w;
 }
@@ -186,19 +240,16 @@ function railCard(which, policy, prompt) {
   const blocked = !!policy;
   card.className = "border rounded-md p-3 text-[13px] " +
     (blocked ? "border-[#E3C4C4] bg-[#FDF6F6]" : "border-line bg-sand");
+  const tag = which ? `<span class="text-muted text-[11px] ml-auto">${which}</span>` : "";
   card.innerHTML = blocked
     ? `<div class="flex items-center gap-2 mb-1">
          <span class="inline-block w-2 h-2 rounded-full" style="background:#B23B3B"></span>
-         <span class="font-semibold text-block">Blocked on the ${policy.direction.toLowerCase()}</span>
-         ${which ? `<span class="text-muted text-[11px] ml-auto">${which}</span>` : ""}
-       </div>
-       <div class="text-muted mb-1">${policy.guardrail}</div>
+         <span class="font-semibold text-block">Blocked on the ${String(policy.direction || "").toLowerCase()}</span>${tag}</div>
+       <div class="text-muted mb-1">${policy.guardrail || ""}</div>
        <div class="font-mono text-[11px] leading-snug break-words">${policy.assessment || policy.reason || ""}</div>`
     : `<div class="flex items-center gap-2 mb-1">
          <span class="inline-block w-2 h-2 rounded-full" style="background:#3F7A52"></span>
-         <span class="font-semibold text-pass">Allowed</span>
-         ${which ? `<span class="text-muted text-[11px] ml-auto">${which}</span>` : ""}
-       </div>
+         <span class="font-semibold text-pass">Allowed</span>${tag}</div>
        <div class="text-muted break-words">${prompt.slice(0, 90)}${prompt.length > 90 ? "..." : ""}</div>`;
   $("rail").prepend(card);
 }
@@ -206,18 +257,13 @@ function railCard(which, policy, prompt) {
 async function ask(url, thread, text, which) {
   const t = thinking(thread);
   try {
-    const r = await fetch(url, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, session_id: session, context: {} }),
-    });
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, session_id: session, context: {} }) });
     const data = await r.json();
     t.remove();
     bubble(thread, "agent", data.response || "(no response)");
     railCard(which, data.policy || null, text);
-  } catch (err) {
-    t.remove();
-    bubble(thread, "agent", "Could not reach the agent at " + url);
-  }
+  } catch (err) { t.remove(); bubble(thread, "agent", "Could not reach the agent at " + url); }
 }
 
 async function send() {
@@ -232,7 +278,6 @@ async function send() {
   ]);
   $("send").disabled = false; $("msg").focus();
 }
-
 $("send").addEventListener("click", send);
 $("msg").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
 </script>

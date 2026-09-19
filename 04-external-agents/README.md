@@ -803,7 +803,7 @@ to grow**, and check your own instance with the Console's policy picker.
 Two rows deserve a second look even if you do not demo them. **Provider
 translation** means moving an agent from OpenAI to Bedrock is gateway
 configuration rather than an agent change. And **rate and cost** only exists
-at provider level, so you cannot give one agent a tighter token budget through
+at provider level for the moment, so you cannot give one agent a tighter token budget through
 a guardrail - that needs a second provider.
 
 
