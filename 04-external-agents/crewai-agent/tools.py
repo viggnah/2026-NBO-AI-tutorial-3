@@ -7,6 +7,9 @@ framework, not the data.
 
 Each tool validates input defensively and returns JSON. Tools never raise
 into the agent loop.
+
+Each is also wrapped in `traced_tool`, which emits the `execute_tool` span
+CrewAI's auto-instrumentation does not - see `instrumentation.py`.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from typing import Any
 
 from crewai.tools import tool
 
+from instrumentation import traced_tool
 from shared import MENU, RECOMMENDATIONS, ROOMS
 
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -27,6 +31,7 @@ def _json(payload: dict[str, Any]) -> str:
 
 
 @tool("check_room_availability")
+@traced_tool
 def check_room_availability(
     room_type: str,
     check_in: str | None = None,
@@ -64,6 +69,7 @@ def check_room_availability(
 
 
 @tool("get_room_service_menu")
+@traced_tool
 def get_room_service_menu(vegetarian_only: bool | None = None) -> str:
     """Return the room service menu.
 
@@ -108,7 +114,9 @@ get_local_recommendations.__doc__ = f"""Return curated recommendations near the 
         category: One of: {_CATEGORIES}.
     """
 
-get_local_recommendations = tool("get_local_recommendations")(get_local_recommendations)
+get_local_recommendations = tool("get_local_recommendations")(
+    traced_tool(get_local_recommendations)
+)
 
 
 CREW_TOOLS = [

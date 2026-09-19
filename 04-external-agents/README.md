@@ -18,10 +18,11 @@ A second concierge for the same hotel:
 
 ```
 crewai-agent/
-  agent.py     FastAPI service and a one-member crew
-  tools.py     the same three tools, bound to CrewAI
-  shared.py    imports the hotel data and system prompt from ../../agent
-  main.py      entry point
+  agent.py            FastAPI service and a two-member crew
+  tools.py            the same three tools, bound to CrewAI
+  instrumentation.py  the tool spans CrewAI does not emit
+  shared.py           imports the hotel data and system prompt from ../../agent
+  main.py             entry point
 seed-traffic.sh
 ```
 
@@ -30,6 +31,7 @@ It is deliberately the same product and deliberately a different build:
 | | `agent/` (modules 01–03) | `crewai-agent/` (this module) |
 |---|---|---|
 | Framework | LangGraph | CrewAI |
+| Shape | one agent, a tool-calling loop | two agents in sequence |
 | Hosting | Platform-Hosted, built from Git | Externally-Hosted, started by you |
 | In front of it | Agent Manager's ingress gateway | nothing |
 | HTTP contract | `POST /chat` | the same |
@@ -40,6 +42,28 @@ The data and the prompt are imported rather than copied, so the claim that
 this is the same concierge is one you can check rather than take on trust.
 `shared.py` is the three lines that do it. Any difference you see between
 the two agents is the framework, because nothing else was allowed to vary.
+
+### Two agents, not one
+
+The platform-hosted agent is a single tool-calling loop. This one is a crew of
+two, because that is what CrewAI is for and because a real external agent is
+rarely a clone of yours:
+
+| Member | Tools | Does |
+|---|---|---|
+| **Concierge at The Grand Meridian** | all three | gathers the facts and drafts a reply |
+| **Guest Relations Editor** | none | rewrites the draft in the house voice, changing no figure |
+
+Both members are given the *same* `agent/system_prompt.py` as their standard,
+so the house style is still defined in one place. The editor is told, on top of
+that, that it is an editor and not a source: every fact in its version must
+already be in the draft it was handed.
+
+This matters in two places later. In the trace, each member gets its own
+`agent` span, so you can see which one spent the time and which one wrote the
+words the guest actually read. In evaluation, the editor creates something
+module 03 could only describe in the abstract - an intermediate model call the
+guest never sees, which an LLM-level evaluator scores anyway.
 
 ## Why it does not need to be reachable
 
@@ -229,46 +253,66 @@ used, for an agent the platform never built.
 > picker opens on a short window. Spans are batched, so allow a few seconds.
 
 Open the comparison request. A crew is not a graph, so the tree is shaped
-differently from module 02's. Six spans, from two different instrumentors:
+differently from module 02's - and both crew members are visible in it:
+
+```
+crewai.workflow                                              4130ms
+  The guest says: "Compare a junior suite and the pres...    2850ms
+    Concierge at The Grand Meridian.agent                    2849ms
+      openai.chat                                            1464ms
+      openai.chat                                            1354ms
+      execute_tool check_room_availability                       0ms
+      execute_tool check_room_availability                       0ms
+  Edit the concierge's draft into the reply the guest...     1226ms
+    Guest Relations Editor.agent                             1225ms
+      openai.chat                                            1211ms
+```
+
+Ten spans from **three** sources, which is worth pausing on:
 
 | Span | Emitted by | Carries |
 |---|---|---|
-| `crewai.workflow` | CrewAI | the root - crew config, result, token usage |
-| `<the task description>.task` | CrewAI | task description, expected output, output |
-| `<the agent's role>.agent` | CrewAI | role, goal, backstory, the tool list |
-| `openai.chat` ×3 | OpenAI SDK | messages, tokens, finish reason, tool definitions |
+| `crewai.workflow` | CrewAI instrumentation | the root - crew config, result, token usage |
+| `<task description>` | CrewAI instrumentation | description, expected output, output |
+| `<agent role>.agent` | CrewAI instrumentation | role, goal, backstory, tool list |
+| `openai.chat` | **OpenAI SDK** instrumentation | messages, tokens, finish reason, tool definitions |
+| `execute_tool <name>` | **this repository** | arguments, result, status - see below |
 
-The two instrumentors are worth noticing. CrewAI's own instrumentation
-wraps `Crew.kickoff`, `Agent.execute_task` and `Task.execute_sync`; the
-model calls underneath are caught separately, by the OpenAI
-instrumentation, because CrewAI's OpenAI provider uses the OpenAI SDK.
-Zero-code coverage is the union of whatever recognised libraries your agent
-happens to call, not a single framework integration.
+CrewAI's instrumentation never sees the model calls. Those are caught
+separately, because CrewAI's OpenAI provider goes through the OpenAI SDK,
+which is on the catalogue in its own right. Zero-code coverage is the union of
+whichever recognised libraries your agent happens to call - not one framework
+integration - and the last row is what you add when that union has a hole in
+it.
 
-Two of module 02's three questions are answered here exactly as they were
-there. **Where did the time go** - the three `openai.chat` spans account
-for most of the 2.4 seconds. **What did it cost** - read the tokens across
-the three calls of one request:
+**Read the per-agent split first.** The concierge took 2.85s and the editor
+1.23s of a 4.13s request: two thirds of the time went to gathering facts, one
+third to writing the sentence the guest read. Nobody instrumented that
+division - it falls out of the crew having two members, and it is the first
+question to ask of any multi-agent system that feels slow.
 
-| Model call | Input tokens | Finish reason |
-|---|---|---|
-| 1 | 693 | `tool_call` |
-| 2 | 809 | `tool_call` |
-| 3 | 933 | `stop` |
+Tool spans at 0ms are not a bug either. These tools are dictionary lookups in
+the same process, so they finish inside a millisecond. That is module 02's
+point about where agent latency actually goes, shown rather than asserted:
+three model calls account for 4.0 of the 4.1 seconds.
 
-Same mechanism module 02 described, on a different framework and a
-different model: nothing about the guest's question changed, and the input
-grew by 240 tokens because each tool result was appended before the model
-was asked again.
+**What did it cost** is the same story module 02 told. Read the tokens across
+the model calls of one request and the input grows each time - nothing about
+the guest's question changed, but each tool result was appended before the
+model was asked again, and then the whole draft was handed to a second agent.
+A two-member crew buys you a better-written answer and pays for it in tokens,
+which is a trade worth being able to see before you make it in production.
 
-### Now look for the tool spans
 
-There are none, and the reason is precise rather than a misconfiguration.
-Auto-instrumentation patches a fixed catalogue of libraries, and what it
-patches for CrewAI is `Crew.kickoff`, `Agent.execute_task`,
-`Task.execute_sync` and `LLM.call`. Tools are not in that list.
+### The tool spans, and where they came from
 
-But do not conclude that the tool calls went unrecorded. Open the **third**
+Four of those ten spans are `execute_tool`, sitting under the concierge. They
+are **not** from auto-instrumentation. Zero-code patches a fixed catalogue of
+libraries, and what it patches for CrewAI is `Crew.kickoff`,
+`Agent.execute_task`, `Task.execute_sync` and `LLM.call`. Tools are not on that
+list, and on a stock CrewAI agent there is no tool span at all.
+
+Before writing any, it is worth seeing what you already had. Open an
 `openai.chat` span and read `gen_ai.input.messages`:
 
 ```
@@ -280,35 +324,74 @@ role=assistant   tool_call            check_room_availability {"nights":3,"room_
 role=tool        tool_call_response   {"total_usd": 3600, ...}
 ```
 
-Module 02's third question - **why did it say that** - is answerable after
-all. The guest wrote *"Compare a junior suite and the presidential suite
-for a 3-night stay"*; nothing in that sentence is `room_type` or `nights`,
-and the model extracted both, twice. That is the same finding module 02
-made, recovered from a different place: the conversation the model saw,
-rather than a span of its own.
+The arguments the model chose were never missing. Module 02's third question -
+**why did it say that** - was answerable from the conversation the model saw.
+What was missing is a span: something carrying a tool's name, duration and
+status, that the platform can filter, badge and score.
 
-So the distinction is sharper than "traced" versus "untraced":
+That distinction is the whole reason to write the spans by hand:
 
-| | Platform-hosted (LangGraph) | Here (CrewAI) |
+| | Without tool spans | With them |
 |---|---|---|
-| Tool arguments and results recorded | ✅ | ✅ - inside the LLM messages |
-| A span per tool call | ✅ | ❌ |
-| Per-tool duration | ✅ | ❌ |
-| Tool-level filters and evaluators bind to it | ✅ | ❌ |
+| Arguments and results recorded | ✅ inside the LLM messages | ✅ |
+| Per-tool duration | ❌ | ✅ |
+| Error badge when a tool refuses | ❌ | ✅ |
+| Found by `--condition tool_call_fails` | ❌ | ✅ |
+| Readable without opening a message array | ❌ | ✅ |
 
-The data is there; it is not **first-class**. A tool that fails will not
-raise the error badge, will not be found by `--condition tool_call_fails`,
-and will not be scored by an evaluator that reads tool spans - because
-there is no span carrying its name and status. Finding it means reading a
-message array by hand, which is fine once and useless at scale.
+[`instrumentation.py`](crewai-agent/instrumentation.py) is what closes it, and
+it is one decorator. Agent Manager publishes the contract its own
+instrumentation writes to, so a span emitted against that contract renders
+identically to an auto-instrumented one:
 
-That is the gap worth closing, and closing it is roughly fifteen lines
-against the span contract Agent Manager publishes - see
-[Going further](#going-further). The general lesson transfers past this
-lab: **check the instrumentation catalogue against your own framework
-before assuming coverage**, because the failure mode is not an empty trace.
-It is a trace that looks complete until you go looking for the one span you
-wanted to filter on.
+```python
+with tracer.start_as_current_span(f"execute_tool {name}") as span:
+    span.set_attribute("gen_ai.operation.name", "execute_tool")   # the kind
+    span.set_attribute("gen_ai.tool.name", name)                  # the header
+    span.set_attribute("traceloop.entity.input", json.dumps(arguments))
+    result = fn(**arguments)
+    span.set_attribute("traceloop.entity.output", result)
+```
+
+Applied to each tool, inside CrewAI's own decorator so the description the
+model reads is untouched:
+
+```python
+@tool("check_room_availability")
+@traced_tool
+def check_room_availability(...)
+```
+
+There is no exporter setup in that file and no `init_otel()` call. Under
+`amp-instrument` a tracer provider is already installed, so these spans travel
+out with the rest; run the agent bare and `get_tracer` returns a no-op that
+drops them harmlessly. `init_otel()` is for an agent with *no* auto
+instrumentation - calling it here would point a second exporter at spans that
+already have one.
+
+### The refusal that is now visible
+
+One detail in `instrumentation.py` is worth more than the rest of it. These
+tools never raise; they return `{"error": ...}`. A span that only fails when
+an exception escapes would be **green** for every one of those:
+
+```python
+if isinstance(parsed, dict) and "error" in parsed:
+    span.set_status(Status(StatusCode.ERROR, parsed["error"]))
+    span.set_attribute("error.type", "ToolRefused")
+```
+
+Ask this agent for a room type that does not exist and the tool refuses; the
+span now carries an error badge and turns up under
+`--condition tool_call_fails`. That is exactly the shape of module 02's
+planted fault - a tool that says no, a `200 OK`, and a polite apology - except
+that here it raises its hand instead of waiting to be found.
+
+The lesson generalises past this lab. **Check the instrumentation catalogue
+against your own framework before assuming coverage**, because the failure
+mode is not an empty trace. It is a trace that looks complete until you go
+looking for the one span you wanted to filter on. And when you find the gap,
+the contract is published: closing it is a decorator, not a project.
 
 > **The task span is named after the task description**, which contains the
 > guest's message - so guest utterances appear as span names in the trace
@@ -424,14 +507,7 @@ differ most:
 | `amctl skills install` | ✅ (no login needed) | ✅ |
 | `amctl login` | **not yet** | ✅ |
 
-`amctl login` against the hosted API base fails at discovery today:
-
-```
-X fetch protected-resource metadata: GET .../.well-known/oauth-protected-resource: status 403
-```
-
-The hosted deployment does not publish OAuth protected-resource metadata
-for the CLI yet. Hosted CLI support is on the way; until it lands, treat
+Hosted CLI support is on the way; until it lands, treat
 every hosted step as a console step. Nothing in this module needs the CLI
 except step 9, and step 9 does not need a login.
 
@@ -452,7 +528,7 @@ applies - and those two follow the agent, not the hosting.
 ## Going further
 
 - [Internal and External Agents](https://wso2.github.io/agent-manager/docs/) - what the type fixes at registration, and why it cannot be changed afterwards
-- [AMP Instrumentation](https://wso2.github.io/agent-manager/docs/) - the `amp-instrument` wrapper, the framework catalogue with its tested versions and known limitations, and the **manual instrumentation contract**: the OTLP endpoint, the `x-amp-api-key` header, and the `gen_ai.*` attribute table a hand-written tool span needs. This is what closes step 6's gap.
+- [AMP Instrumentation](https://wso2.github.io/agent-manager/docs/) - the `amp-instrument` wrapper, the framework catalogue with its tested versions and known limitations, and the **manual instrumentation contract**: the OTLP endpoint, the `x-amp-api-key` header, and the `gen_ai.*` attribute table a hand-written tool span needs. This is the contract `instrumentation.py` is written against.
 - [Retrieve AgentID Credentials for an Externally-Hosted Agent](https://wso2.github.io/agent-manager/docs/) - per-environment `client_id`/`client_secret` for an agent the platform cannot inject into. Provisioning starts at registration rather than at deploy, since there is no deploy.
 - [Sample agents](https://github.com/wso2/agent-manager/tree/main/samples) - seven runnable agents across LangGraph, CrewAI, LangChain, Strands, .NET and plain Python. `manual-instrumentation-agent` is the executable reference for the contract above; `dotnet-agent` is the external path in a language the platform does not auto-instrument at all.
 

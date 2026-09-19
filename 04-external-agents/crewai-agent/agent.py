@@ -42,7 +42,7 @@ from tools import CREW_TOOLS  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("concierge")
 
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.4-mini-2026-03-17")
 
 # Optional. Set it to talk to anything that speaks the OpenAI API instead of
 # OpenAI itself - Groq, vLLM, an Agent Manager LLM Service Provider. Leave it
@@ -78,14 +78,44 @@ def _get_llm() -> LLM:
     return _llm
 
 
+# The crew is two members, and the split is the reason this agent is built on
+# CrewAI rather than being a second copy of the LangGraph one. The concierge
+# gathers facts with the tools; the editor is handed the draft and holds it to
+# the house voice, with no tools of its own and no authority to change a
+# figure. Each member produces its own `agent` span, so a trace shows which
+# one spent the time and which one wrote the words the guest actually read.
+
+
 def _concierge() -> Agent:
-    """The crew member. Its backstory is the platform-hosted agent's system
-    prompt, unedited, so the two agents are held to identical instructions."""
+    """Gathers the facts. Its backstory is the platform-hosted agent's system
+    prompt, unedited, so both agents are held to identical instructions."""
     return Agent(
         role=f"Concierge at {HOTEL_NAME}",
         goal="Answer the guest's question accurately, grounded in tool data.",
         backstory=SYSTEM_PROMPT,
         tools=CREW_TOOLS,
+        llm=_get_llm(),
+        allow_delegation=False,
+        verbose=bool(os.environ.get("CREW_VERBOSE")),
+    )
+
+
+def _editor() -> Agent:
+    """Holds the draft to the house voice. No tools, and no licence to invent:
+    everything it is allowed to say is already in front of it."""
+    return Agent(
+        role="Guest Relations Editor",
+        goal="Make the reply sound like the house, without changing what it says.",
+        backstory=(
+            f"You edit outgoing guest correspondence for {HOTEL_NAME}.\n\n"
+            "The standards you enforce are the concierge's own:\n\n"
+            f"{SYSTEM_PROMPT}\n\n"
+            "You are an editor, not a source. Every fact, figure, room name, "
+            "menu item and recommendation in your version must already appear "
+            "in the draft you were given. Do not add one, remove one, or round "
+            "a price. If the draft is already right, return it unchanged."
+        ),
+        tools=[],
         llm=_get_llm(),
         allow_delegation=False,
         verbose=bool(os.environ.get("CREW_VERBOSE")),
@@ -152,19 +182,32 @@ def chat(req: ChatRequest) -> ChatResponse:
     sid = req.session_id or "_anonymous_"
     history = SESSIONS.get(sid, [])
 
-    concierge = _concierge()
-    task = Task(
+    concierge, editor = _concierge(), _editor()
+
+    answer = Task(
         description=_task_description(history, req.message),
         expected_output=(
-            "The concierge's reply to the guest: prose, in character, leading "
-            "with the answer. No JSON, no preamble, no restating the question."
+            "A draft reply to the guest, grounded in tool data: every figure "
+            "and name taken from a tool result, nothing invented."
         ),
         agent=concierge,
     )
+    polish = Task(
+        description=(
+            "Edit the concierge's draft into the reply the guest receives. "
+            "Keep every fact exactly as it stands."
+        ),
+        expected_output=(
+            "The final reply: prose, in character, leading with the answer. "
+            "No JSON, no preamble, no restating the question."
+        ),
+        agent=editor,
+        context=[answer],
+    )
 
     crew = Crew(
-        agents=[concierge],
-        tasks=[task],
+        agents=[concierge, editor],
+        tasks=[answer, polish],
         process=Process.sequential,
         verbose=bool(os.environ.get("CREW_VERBOSE")),
     )
