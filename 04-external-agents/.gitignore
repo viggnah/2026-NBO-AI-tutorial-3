@@ -4,3 +4,6 @@ docs
 
 # Written by crewai-agent/run.sh to track the process it started.
 .run.pid
+
+# Local .env backups, e.g. one per registered agent. They hold live keys.
+.env.*.backup
