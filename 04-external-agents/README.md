@@ -61,16 +61,6 @@ looks things up and writes terse notes for a colleague, and the writer - which
 has no tools and therefore no way to invent a price - turns those notes into
 prose.
 
-**The division has to be real, and it is worth knowing how we found out.** An
-earlier version of this crew gave both members the whole prompt and asked the
-second to "polish" the first's draft. Measured across five prompts, its output
-was **byte-identical every time**, for a third of the latency and a third of
-the tokens. That is the failure mode of multi-agent design: two agents doing
-one job, which is not a system, just a bill. Splitting the responsibility
-instead of duplicating it took the same five prompts to 25-72% similarity
-between brief and reply, and the total request got *faster*, because the
-concierge no longer writes prose nobody reads.
-
 This matters in two places later. In the trace, each member gets its own
 `agent` span, so you can see which one spent the time and which one wrote the
 words the guest actually read. In evaluation, the brief is something module 03
@@ -493,30 +483,14 @@ the same dashboard, as the agent the platform operates.
 The two gateway rows are the ones worth reading carefully, because they point
 in opposite directions.
 
-**Inbound**, the platform cannot help. An environment's ingress gateway
-fronts workloads the platform runs, and registering an external agent tells
-it a name and a description - not a hostname. There is nowhere for the
-platform to send traffic, so authenticating and rate-limiting callers stays
-your problem. Put your own gateway in front of it, as you would for any
-service you host.
+**Inbound**, the platform cannot help. Registering an external agent tells it
+a name and a description, not a hostname, so there is nowhere to send traffic.
+Authenticating and rate-limiting callers stays your problem.
 
 **Outbound**, it can, and this is the row most people miss. Attach an
-org-level **LLM Service Provider** to this agent under **Configure → Add LLM
-Configuration**, and the console hands back a gateway **Endpoint URL**, a
-header name (`API-Key`) and a key. Point the agent's LLM client at that URL
-instead of the provider's and every model call routes through the platform:
-rate limits, access control and **guardrails** apply centrally, and the real
-provider credential never reaches your agent. Guardrails attach at the
-provider *and* at this agent's binding to it, and the two compose.
-
-For this agent that is configuration, not a rewrite, because it already reads
-`OPENAI_BASE_URL`. The only code it needs is the custom header, since the
-OpenAI SDK sends `Authorization: Bearer` and the gateway wants `API-Key`:
-
-```python
-LLM(model=LLM_MODEL, base_url=OPENAI_BASE_URL, api_key=...,
-    additional_params={"extra_headers": {"API-Key": LLM_GATEWAY_KEY}})
-```
+org-level **LLM Service Provider** and every model call routes through the
+platform - rate limits, access control and guardrails applied centrally, with
+the provider credential never reaching your agent. That is step 10.
 
 `logs` and `metrics` are not available for externally-hosted agents:
 
@@ -854,6 +828,9 @@ The policy catalogue is reported by the gateway, not fixed by Agent Manager,
 so this is the current shape of it rather than a permanent list - **expect it
 to grow**, and check your own instance with the Console's policy picker.
 
+<details>
+<summary><b>The current catalogue</b> (click to expand)</summary>
+
 | Category | Policies | Notes |
 |---|---|---|
 | **Block / allow** | `regex`, `url`, `json-schema`, `content-length`, `word-count`, `sentence-count` | fail **closed** |
@@ -864,6 +841,8 @@ to grow**, and check your own instance with the Console's policy picker.
 | **Provider translation** | OpenAI to Anthropic / Azure / Bedrock / Gemini / Mistral | the agent speaks OpenAI; the gateway translates |
 | **Performance** | `semantic-cache` | serves a similar earlier answer without calling upstream |
 | **Auth and transport** | api-key, JWT, basic, opaque token, OAuth2 generator, AWS SigV4, CORS | inbound and upstream auth |
+
+</details>
 
 Two rows deserve a second look even if you do not demo them. **Provider
 translation** means moving an agent from OpenAI to Bedrock is gateway
