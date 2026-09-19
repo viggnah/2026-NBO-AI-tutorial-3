@@ -38,10 +38,11 @@
     background-size:auto, auto, 26px 26px;
   }
   .thread { scrollbar-width:thin; }
-  /* The chat paper. Faint scattered deco motifs so the panel is not a
-     blank white rectangle; the bubbles sit on top and stay opaque, so
-     nothing competes with the text. */
-  .chatpaper { background-color:#fff; background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27160%27%20height%3D%27160%27%20viewBox%3D%270%200%20160%20160%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23C9A84C%27%20stroke-width%3D%271.1%27%20opacity%3D%270.30%27%3E%3Ccircle%20cx%3D%2722%27%20cy%3D%2728%27%20r%3D%276%27%2F%3E%3Cpath%20d%3D%27M96%2016%20l7%207%20-7%207%20-7%20-7%20z%27%2F%3E%3Ccircle%20cx%3D%27132%27%20cy%3D%2754%27%20r%3D%273.5%27%2F%3E%3Ccircle%20cx%3D%2764%27%20cy%3D%2760%27%20r%3D%272.5%27%2F%3E%3Cpath%20d%3D%27M34%2096%20l6%206%20-6%206%20-6%20-6%20z%27%2F%3E%3Ccircle%20cx%3D%27112%27%20cy%3D%27104%27%20r%3D%275%27%2F%3E%3Cpath%20d%3D%27M146%20126%20l5%205%20-5%205%20-5%20-5%20z%27%2F%3E%3Ccircle%20cx%3D%2720%27%20cy%3D%27140%27%20r%3D%273%27%2F%3E%3Ccircle%20cx%3D%2778%27%20cy%3D%27132%27%20r%3D%274%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"); background-size:160px 160px; }
+  /* The deco layer is painted once per panel by scatter() and sits behind the
+     messages. It does not scroll with them, so it reads as the paper rather
+     than as content. */
+  .deco { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
+  .thread > * { position:relative; z-index:1; }
   .bubble-guest { background:#1B2B4B; color:#fff; }
   .bubble-agent { background:#fff; border:1px solid #E6E2D6; }
   .dot { width:6px;height:6px;border-radius:50%;background:#C9A84C;display:inline-block;animation:b 1.2s infinite }
@@ -127,13 +128,13 @@
   <div class="flex-1 min-h-0 grid gap-6 px-8 py-6" style="grid-template-columns:minmax(0,1fr) 370px;">
     <section class="flex flex-col min-h-0">
       <div id="cols" class="grid gap-4 flex-1 min-h-0" style="grid-template-columns:1fr;">
-        <div class="border border-line rounded-lg bg-white/85 backdrop-blur flex flex-col min-h-0 shadow-sm">
-          <div class="px-4 py-2 border-b border-line text-[11px] uppercase tracking-wider text-muted">Concierge</div>
-          <div id="t1" class="thread chatpaper flex-1 overflow-y-auto p-4 space-y-3"></div>
+        <div class="chat-panel border border-line rounded-lg bg-white/85 backdrop-blur flex flex-col min-h-0 shadow-sm relative overflow-hidden">
+          <div class="px-4 py-2 border-b border-line text-[11px] uppercase tracking-wider text-muted relative z-10">Concierge</div>
+          <div id="t1" class="thread flex-1 overflow-y-auto p-4 space-y-3"></div>
         </div>
-        <div id="pane2" class="border border-line rounded-lg bg-white/85 backdrop-blur flex-col min-h-0 hidden shadow-sm">
-          <div class="px-4 py-2 border-b border-line text-[11px] uppercase tracking-wider text-muted">Second endpoint</div>
-          <div id="t2" class="thread chatpaper flex-1 overflow-y-auto p-4 space-y-3"></div>
+        <div id="pane2" class="chat-panel border border-line rounded-lg bg-white/85 backdrop-blur flex-col min-h-0 hidden shadow-sm relative overflow-hidden">
+          <div class="px-4 py-2 border-b border-line text-[11px] uppercase tracking-wider text-muted relative z-10">Second endpoint</div>
+          <div id="t2" class="thread flex-1 overflow-y-auto p-4 space-y-3"></div>
         </div>
       </div>
       <div class="mt-3 flex flex-wrap gap-2" id="chips"></div>
@@ -188,6 +189,63 @@ const SCENARIOS = [
   { label: "Card number", hint: "PII masking - proof is upstream", text: "My card is 4111 1111 1111 1111. Can you note it on my booking?" },
 ];
 
+
+/* ---- decorative scatter -------------------------------------------------
+   A repeating CSS tile looks like what it is: a grid. This places shapes by
+   stratified sampling instead - the panel is divided into cells and each cell
+   gets one shape at a random point inside it. Every cell is occupied, so the
+   density is even and no gap opens up; no two shapes share a coordinate, so
+   there is no lattice to notice. Re-run on resize, because cell count follows
+   the panel size.                                                          */
+const CELL = 92;           // px; smaller = denser
+const INSET = 0.18;        // keep shapes off the cell edges, which would clump
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+function shape(x, y) {
+  const gold = Math.random() < 0.72;
+  const stroke = gold ? "#C9A84C" : "#1B2B4B";
+  const op = (gold ? rnd(0.22, 0.40) : rnd(0.10, 0.20)).toFixed(2);
+  const r = rnd(2.5, 7);
+  const kind = Math.random();
+  const common = `fill="none" stroke="${stroke}" stroke-width="1.1" opacity="${op}"`;
+  if (kind < 0.45) return `<circle cx="${x}" cy="${y}" r="${r.toFixed(1)}" ${common}/>`;
+  if (kind < 0.80) {
+    const d = r * 1.15;
+    return `<path d="M${(x).toFixed(1)} ${(y-d).toFixed(1)} l${d.toFixed(1)} ${d.toFixed(1)} l${(-d).toFixed(1)} ${d.toFixed(1)} l${(-d).toFixed(1)} ${(-d).toFixed(1)} z" ${common}/>`;
+  }
+  if (kind < 0.92) return `<circle cx="${x}" cy="${y}" r="1.6" fill="${stroke}" opacity="${op}" stroke="none"/>`;
+  const a = r * 0.9;
+  return `<path d="M${(x-a).toFixed(1)} ${y} h${(a*2).toFixed(1)} M${x} ${(y-a).toFixed(1)} v${(a*2).toFixed(1)}" ${common}/>`;
+}
+
+function scatter(panel) {
+  const w = panel.clientWidth, h = panel.clientHeight;
+  if (!w || !h) return;
+  const cols = Math.max(1, Math.round(w / CELL));
+  const rows = Math.max(1, Math.round(h / CELL));
+  const cw = w / cols, ch = h / rows;
+  let out = "";
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = (c + rnd(INSET, 1 - INSET)) * cw;
+      const y = (r + rnd(INSET, 1 - INSET)) * ch;
+      out += shape(+x.toFixed(1), +y.toFixed(1));
+    }
+  }
+  let svg = panel.querySelector(":scope > .deco");
+  if (!svg) {
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "deco");
+    panel.prepend(svg);
+  }
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.innerHTML = out;
+}
+
+const decorate = () => document.querySelectorAll(".chat-panel").forEach(scatter);
+new ResizeObserver(decorate).observe(document.body);
+
 const $ = (id) => document.getElementById(id);
 let session = "ui-" + Math.random().toString(36).slice(2, 8);
 
@@ -199,7 +257,7 @@ $("chips").addEventListener("click", (e) => {
   $("msg").value = SCENARIOS[+b.dataset.i].text; send();
 });
 
-const openStage  = () => { $("stage").classList.add("on"); document.body.style.overflow = "hidden"; $("msg").focus(); };
+const openStage  = () => { $("stage").classList.add("on"); document.body.style.overflow = "hidden"; requestAnimationFrame(decorate); $("msg").focus(); };
 const closeStage = () => { $("stage").classList.remove("on"); document.body.style.overflow = ""; };
 $("open").addEventListener("click", openStage);
 $("close").addEventListener("click", closeStage);
@@ -211,6 +269,9 @@ $("cmp").addEventListener("change", (e) => {
   $("pane2").classList.toggle("hidden", !on);
   $("pane2").classList.toggle("flex", on);
   $("cols").style.gridTemplateColumns = on ? "1fr 1fr" : "1fr";
+  // Revealing the second pane does not resize the body, so the observer
+  // will not fire; paint it here.
+  requestAnimationFrame(decorate);
 });
 
 $("reset").addEventListener("click", () => {
