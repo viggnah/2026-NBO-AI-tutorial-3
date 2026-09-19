@@ -23,6 +23,7 @@ crewai-agent/
   instrumentation.py  the tool spans CrewAI does not emit
   shared.py           imports the hotel data and system prompt from ../../agent
   main.py             entry point
+  run.sh              start / restart / stop it, instrumented
 seed-traffic.sh
 ```
 
@@ -189,6 +190,11 @@ changes is how the process starts:
 ```bash
 amp-instrument python main.py
 ```
+
+[`run.sh`](crewai-agent/run.sh) wraps that for the rest of the module -
+`./run.sh` re-reads `.env` and restarts, `./run.sh status` says what the agent
+is pointed at, `./run.sh stop` ends it. You will change `.env` several times
+from here on, and restarting is the only way those changes take.
 
 That is the entire integration. No import, no decorator, no initialisation
 call, no SDK in the code - `agent.py` has no idea any of this is happening.
@@ -455,7 +461,8 @@ free, and being straight about the trade is part of presenting it:
 | Traces, spans, token accounting | ✅ | ✅ |
 | Evaluation, monitors, custom evaluators | ✅ | ✅ |
 | AgentID credentials per environment | injected | generated, wired by you |
-| `amctl agent logs` / `metrics` / `traces` | ✅ | **refused** |
+| `amctl agent logs` / `metrics` | ✅ | **refused** |
+| `amctl agent traces` / `trace` / `traces export` | ✅ | ✅ |
 
 The two gateway rows are the ones worth reading carefully, because they point
 in opposite directions.
@@ -485,16 +492,139 @@ LLM(model=LLM_MODEL, base_url=OPENAI_BASE_URL, api_key=...,
     additional_params={"extra_headers": {"API-Key": LLM_GATEWAY_KEY}})
 ```
 
-The last row catches people too. The runtime-observability subcommands work
-against platform-managed agents only and fail up front with an explicit
-error for an external one. The traces exist and the console shows them -
-it is the CLI's runtime commands that do not apply, because there is no
-workload here for the platform to read from.
+The last two rows are worth testing rather than believing, because the split
+is not where the CLI reference says it is. `logs` and `metrics` do refuse:
+
+```bash
+amctl agent logs external-grand-meridian-c --project session-1 --env gvisor --json
+```
+```
+VALIDATION: agent "external-grand-meridian-c" is externally provisioned
+  Runtime logs and metrics are only available for internally-provisioned agents.
+```
+
+That is the right answer - there is no pod here, so there is no pod log and no
+pod metric. But read the message closely: it names **logs and metrics**, and
+nothing else. Traces are not runtime state read out of a workload; they are
+records the agent pushed, and the CLI serves them the same for both kinds of
+agent:
+
+```bash
+amctl agent traces external-grand-meridian-c --project session-1 --env gvisor --since 12h --json \
+  | jq -r '.data.traces[] | "\(.traceId[0:8])  \(.spanCount) spans"'
+```
+```
+4e47f485  9 spans
+b993548a  10 spans
+```
+
+`amctl agent trace <id>` and `traces export` work too. Run the same command
+against both agents side by side and the boundary explains itself: the
+platform can only tell you about a process it is running, but it can tell you
+about work any agent did.
 
 The shape of the deal: **the platform governs what it does not operate.**
 Observability and evaluation follow the agent's *record*, not its runtime.
 
-## Step 9 - The platform, from an agent's side of the desk
+## Step 9 - Govern the model calls, not just the agent
+
+Look at what this agent has been doing for the whole module. It holds a live
+`sk-...` in a file on your laptop and calls the provider directly. There is no
+spend cap on it, no content policy over it, and no way to revoke it that does
+not involve rotating the key for everyone else using it.
+
+That is not a flaw in the lab. It is the ordinary state of most agents in an
+organisation, and it is the part of "governance" that observability and
+evaluation do not touch: both of those *watch*. Neither is in a position to
+*stop* anything, because neither is in the request path - which was the point
+of module 03's opening, and is a limitation as much as a feature.
+
+Step 8 showed the platform cannot help on the way **in** to this agent. On the
+way **out**, to the model, it can.
+
+### Step 9.1 - Register a provider and attach it
+
+1. At the organization level, register an **LLM Service Provider** for OpenAI
+   with your real key. This is the only place the provider credential now
+   lives.
+2. Open this agent, click **Configure**, then **+ Add LLM Configuration**.
+3. Select the provider. Optionally add **Guardrails** here - these apply to
+   this agent's use of the provider, on top of any on the provider itself.
+4. **Save.** The **Connect to LLM Provider** panel opens with three things:
+
+   | Field | Goes into |
+   |---|---|
+   | **Endpoint URL** | `OPENAI_BASE_URL` |
+   | **API Key** (shown once) | `LLM_GATEWAY_API_KEY` |
+   | **Header Name** (`API-Key`) | the default, nothing to set |
+
+### Step 9.2 - Point the agent at it
+
+```bash
+# in crewai-agent/.env
+OPENAI_BASE_URL=<Endpoint URL from the panel>
+LLM_GATEWAY_API_KEY=<API Key from the panel>
+# OPENAI_API_KEY=sk-...        <- comment it out
+```
+
+```bash
+./run.sh
+curl -s localhost:8000/health | jq
+# → "llm_via_gateway": true
+```
+
+Ask it anything. **The answers are identical and the agent's own key is gone.**
+Same crew, same tools, same traces - and every model call now passes a policy
+you administer centrally, with the provider credential held by the platform
+rather than by this process.
+
+That is the whole demonstration, and it is a two-line configuration change,
+because `agent.py` already reads a base URL. The only code the gateway needed
+was the header, since the OpenAI client sends `Authorization: Bearer` and the
+gateway reads `API-Key`:
+
+```python
+extra["extra_headers"] = {LLM_GATEWAY_HEADER: LLM_GATEWAY_KEY}
+```
+
+> **One trap, and it is a quiet one.** CrewAI calls `load_dotenv()` when it is
+> imported. So a stale `OPENAI_API_KEY` left in `.env` is back in the
+> environment before any of your code runs, and the OpenAI client will happily
+> put it in an `Authorization` header on every call *through the gateway* -
+> where the only place you would ever see it is the gateway's access log.
+>
+> `agent.py` therefore **suppresses** the provider key in gateway mode rather
+> than falling back to it, and sends a placeholder the gateway ignores. Worth
+> knowing generally: "the agent no longer has the credential" is a claim about
+> what the process sends, not about what you deleted from a file.
+
+### Step 9.3 - Watch a guardrail refuse
+
+Guardrails are the reason to do any of this. Add one to the provider or to
+this agent's binding, then send the traffic that should trip it.
+
+The pairing worth showing is a **PII or card-number guardrail**, because
+module 03 already scored exactly that with **Content Safety** - the same
+concern, handled two completely different ways:
+
+| | Evaluation (module 03) | Guardrail (here) |
+|---|---|---|
+| When | after the fact, on stored traces | in the request path |
+| Effect | a score and an explanation | the call is refused |
+| Cost of a miss | you find out later | the guest never sees it |
+| Sees | the whole trace | one model call |
+
+Neither replaces the other, and the last row is the honest limit to state out
+loud. **A guardrail cannot stop this agent calling the wrong tool.** It sits
+on the LLM hop, so it sees prompts and completions, not the concierge's
+decision to look up `dining` instead of `restaurants`. That failure is
+invisible to it and was caught in module 02 by a trace, and in module 03 by an
+evaluator. Guardrails block what a model says; traces and evaluators explain
+what an agent did. An estate needs all three, and this module is the one where
+an agent you do not run gets all three anyway.
+
+
+## Step 10 - The platform, from an agent's side of the desk
 
 One more thing, and it is about the platform rather than about the agent.
 Everything in this lab has been a person driving a console or a CLI. The
@@ -548,11 +678,23 @@ except step 9, and step 9 does not need a login.
 | 01 | Somewhere to run it | yes |
 | 02 | A record of what happened inside a request | yes |
 | 03 | A score for whether it was any good | no - it reads traces |
-| 04 | The same two, for an agent run elsewhere | **no** |
+| 04 | The same two, plus a governed path to the model, for an agent run elsewhere | **no** |
 
 The through-line is in the last column. Build and deploy are a service the
-platform offers. Observability and evaluation are the governance it
-applies - and those two follow the agent, not the hosting.
+platform offers. Observability, evaluation and control of the model call are
+the governance it applies - and those follow the agent, not the hosting.
+
+Which leaves three instruments doing three different jobs, and it is worth
+being able to say which is which:
+
+| | Answers | When | Can it stop anything? |
+|---|---|---|---|
+| **Traces** | what the agent did | after | no |
+| **Evaluation** | whether it was any good | after | no |
+| **Guardrails** | what the model may be asked and may reply | during | yes |
+
+An agent the platform never built, never deployed and does not run gets all
+three.
 
 ## Going further
 

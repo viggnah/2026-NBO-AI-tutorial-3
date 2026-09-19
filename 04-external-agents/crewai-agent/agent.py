@@ -49,6 +49,19 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.4-mini-2026-03-17")
 # unset for OpenAI.
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL") or None
 
+# Set this and the agent routes its model calls through Agent Manager's LLM
+# gateway instead of calling a provider directly: rate limits, access control
+# and guardrails are then applied centrally, and the provider's real
+# credential never reaches this process. Both values come from the console -
+# Configure -> Add LLM Configuration -> Connect to LLM Provider - where
+# OPENAI_BASE_URL is the Endpoint URL it shows and this is the API Key.
+#
+# The header is the one thing the OpenAI client cannot infer. It sends the
+# key as `Authorization: Bearer`, and the gateway reads `API-Key`, so the
+# key has to be attached explicitly below.
+LLM_GATEWAY_KEY = os.environ.get("LLM_GATEWAY_API_KEY") or None
+LLM_GATEWAY_HEADER = os.environ.get("LLM_GATEWAY_HEADER", "API-Key")
+
 # CrewAI resolves the provider from the part of the model name before the
 # first slash. Everything here speaks the OpenAI API, so the provider is
 # always "openai" and the rest of the name is passed through untouched -
@@ -69,11 +82,31 @@ _llm: LLM | None = None
 def _get_llm() -> LLM:
     global _llm
     if _llm is None:
+        extra: dict[str, Any] = {}
+        if LLM_GATEWAY_KEY:
+            extra["extra_headers"] = {LLM_GATEWAY_HEADER: LLM_GATEWAY_KEY}
+            # Deliberately NOT the provider key. The gateway authenticates on
+            # its own header and holds the real credential itself, so sending
+            # ours upstream would be pointless and would leak it.
+            #
+            # This is a suppression, not a fallback, and it has to be: CrewAI
+            # calls dotenv's load_dotenv() when it is imported, so a stale
+            # OPENAI_API_KEY left in .env is back in the environment before
+            # this line runs. Reading the variable here would quietly put the
+            # real key in an Authorization header on every gateway call, and
+            # the only place you would see it is the gateway's access log.
+            # The OpenAI client will not build without something, hence the
+            # placeholder.
+            api_key = "amp-gateway"
+        else:
+            api_key = os.environ.get("OPENAI_API_KEY")
+
         _llm = LLM(
             model=LLM_MODEL,
-            api_key=os.environ.get("OPENAI_API_KEY"),
+            api_key=api_key,
             base_url=OPENAI_BASE_URL,
             temperature=0,
+            additional_params=extra,
         )
     return _llm
 
@@ -170,6 +203,7 @@ def health() -> dict[str, Any]:
         "ok": True,
         "model": LLM_MODEL,
         "base_url": OPENAI_BASE_URL or "https://api.openai.com/v1",
+        "llm_via_gateway": bool(LLM_GATEWAY_KEY),
         "instrumented": bool(os.environ.get("AMP_OTEL_ENDPOINT")),
     }
 
