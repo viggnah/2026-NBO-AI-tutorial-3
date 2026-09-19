@@ -167,6 +167,25 @@ Registration creates a record to hang observability and governance on.
 
 Click **Register**. The **Setup Agent** panel opens on its own.
 
+### Or ask your assistant to register it
+
+The console is worth doing once, to see what the form does and does not ask
+for. After that it is a task to hand over. With the `manage-agent` skill
+installed (step 9), the whole of the above is a sentence:
+
+> *"Register an externally-hosted agent called `[External] Grand Meridian
+> Concierge 2` in the `TestSession1` project, then generate an API key for
+> the default environment."*
+
+The assistant runs `amctl agent create --provisioning external`, reads back
+the identifier the platform derived, and mints the key. What it cannot do is
+paste that key into your `.env` and restart the process - the key is shown
+once, and it is yours to place.
+
+This is the same claim the module makes about agents, pointed inward: the
+platform is drivable by software, not only by a person with a browser open.
+Step 9 is where the skill comes from.
+
 ## Step 3 - Take the endpoint and the key
 
 The Setup Agent panel carries the two values the agent needs. Pick a
@@ -529,7 +548,36 @@ against both agents side by side and the boundary explains itself: the
 platform can only tell you about a process it is running, but it can tell you
 about work any agent did.
 
-## Step 9 - Govern the model calls, not just the agent
+## Step 9 - The platform, from an agent's side of the desk
+
+One more thing, and it is about the platform rather than about the agent.
+Everything in this lab has been a person driving a console or a CLI. The
+same lifecycle is meant to be drivable by an AI assistant, and Agent
+Manager ships the instructions for that:
+
+```bash
+amctl skills list
+# → manage-agent (not installed)  Use when an agent needs to drive the full
+#   agent-manager lifecycle through `amctl` ...
+
+amctl skills install
+```
+
+This works with **no instance and no login** - the bundle is fetched from
+[`wso2/agent-skills`](https://github.com/wso2/agent-skills), extracted to
+`~/.agents/skills/`, and linked into whichever assistants are installed
+locally (Claude Code, Cursor, Windsurf). Nothing about it depends on
+whether you are on the hosted version or your own install.
+
+What arrives is written guidance, not a plugin: the verb map, the rules
+that stop calls failing silently, a `troubleshooting.md` of the CLI's sharp
+edges and a `triage.md` that walks build → logs → metrics → traces in
+order. Module 01 installed it; module 02 used it. It is worth naming what
+that means - the platform treats a coding assistant as a first-class
+operator of itself, which is the same claim this module has been making
+about agents, pointed inward.
+
+## Step 10 - Govern the model calls, not just the agent
 
 Look at what this agent has been doing for the whole module. It holds a live
 `sk-...` in a file on your laptop and calls the provider directly. There is no
@@ -545,7 +593,7 @@ of module 03's opening, and is a limitation as much as a feature.
 Step 8 showed the platform cannot help on the way **in** to this agent. On the
 way **out**, to the model, it can.
 
-### Step 9.1 - Register a provider and attach it
+### Step 10.1 - Register a provider and attach it
 
 1. At the organization level, register an **LLM Service Provider** for OpenAI
    with your real key. This is the only place the provider credential now
@@ -561,7 +609,7 @@ way **out**, to the model, it can.
    | **API Key** (shown once) | `LLM_GATEWAY_API_KEY` |
    | **Header Name** (`API-Key`) | the default, nothing to set |
 
-### Step 9.2 - Point the agent at it
+### Step 10.2 - Point the agent at it
 
 ```bash
 # in crewai-agent/.env
@@ -601,7 +649,7 @@ extra["extra_headers"] = {LLM_GATEWAY_HEADER: LLM_GATEWAY_KEY}
 > knowing generally: "the agent no longer has the credential" is a claim about
 > what the process sends, not about what you deleted from a file.
 
-### Step 9.3 - Shrink the door before you police it
+### Step 10.3 - Shrink the door before you police it
 
 Before adding a single policy, look at what the agent can reach. The `openai`
 provider template is built from OpenAI's full OpenAPI spec:
@@ -627,7 +675,7 @@ provider setting rather than a policy, so it costs nothing at runtime.
 > a laptop here); a call that really reached OpenAI takes roughly twice that.
 > If a "blocked" endpoint is as slow as a real completion, it is not blocked.
 
-### Step 9.4 - Two levels, two kinds of rule
+### Step 10.4 - Two levels, two kinds of rule
 
 Attach these in the console. The level is the point: one is a floor for the
 whole organization, the other is this agent's own rule.
@@ -682,7 +730,7 @@ it in the path.
 This rule sits on the **request** phase, so it reads the guest's message.
 `$.messages[-1].content` is the last thing the guest said.
 
-### Step 9.5 - Watch them work
+### Step 10.5 - Watch them work
 
 The regex guardrail is visible from the chat. Ask for something the hotel
 cannot promise:
@@ -752,7 +800,7 @@ given asterisks.
 > timeout` for ten to twenty seconds. It is not a failure; it is why a live
 > before-and-after needs a sentence of narration rather than silence.
 
-### Step 9.6 - Change behaviour without touching the agent
+### Step 10.6 - Change behaviour without touching the agent
 
 Blocking is the obvious use of a gateway and the least interesting. The
 **Prompt Decorator** injects instructions into every request before the model
@@ -781,7 +829,7 @@ guardrail above: the decorator is **prevention**, the regex is
 **enforcement**, and you want both, because a model told not to say something
 still sometimes says it.
 
-### Step 9.7 - A page to demo it from
+### Step 10.7 - A page to demo it from
 
 [`web/index.html`](web/index.html) is a small light-mode page in the hotel's
 own palette: the concierge chat on the left, and on the right a rail showing
@@ -823,35 +871,6 @@ configuration rather than an agent change. And **rate and cost** only exists
 at provider level for the moment, so you cannot give one agent a tighter token budget through
 a guardrail - that needs a second provider.
 
-
-## Step 10 - The platform, from an agent's side of the desk
-
-One more thing, and it is about the platform rather than about the agent.
-Everything in this lab has been a person driving a console or a CLI. The
-same lifecycle is meant to be drivable by an AI assistant, and Agent
-Manager ships the instructions for that:
-
-```bash
-amctl skills list
-# → manage-agent (not installed)  Use when an agent needs to drive the full
-#   agent-manager lifecycle through `amctl` ...
-
-amctl skills install
-```
-
-This works with **no instance and no login** - the bundle is fetched from
-[`wso2/agent-skills`](https://github.com/wso2/agent-skills), extracted to
-`~/.agents/skills/`, and linked into whichever assistants are installed
-locally (Claude Code, Cursor, Windsurf). Nothing about it depends on
-whether you are on the hosted version or your own install.
-
-What arrives is written guidance, not a plugin: the verb map, the rules
-that stop calls failing silently, a `troubleshooting.md` of the CLI's sharp
-edges and a `triage.md` that walks build → logs → metrics → traces in
-order. Module 01 installed it; module 02 used it. It is worth naming what
-that means - the platform treats a coding assistant as a first-class
-operator of itself, which is the same claim this module has been making
-about agents, pointed inward.
 
 ## Hosted or self-managed
 
