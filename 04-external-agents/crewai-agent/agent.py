@@ -111,21 +111,39 @@ def _get_llm() -> LLM:
     return _llm
 
 
-# The crew is two members, and the split is the reason this agent is built on
-# CrewAI rather than being a second copy of the LangGraph one. The concierge
-# gathers facts with the tools; the editor is handed the draft and holds it to
-# the house voice, with no tools of its own and no authority to change a
-# figure. Each member produces its own `agent` span, so a trace shows which
-# one spent the time and which one wrote the words the guest actually read.
+# The crew is two members, and the split has to be a real one. An earlier
+# version gave both the whole system prompt and asked the second to "polish"
+# the first's draft; measured over five prompts its output was byte-identical
+# every time, for a third of the latency and a third of the tokens. Two agents
+# doing one job is not a multi-agent system, it is an expensive one.
+#
+# So the responsibilities are divided rather than duplicated. The concierge
+# owns *what is true*: it holds the tools and produces an internal brief of
+# facts, and nothing it writes is shown to anyone. The writer owns *what the
+# guest reads*: it has no tools and cannot look anything up, so it can only
+# phrase what the brief already contains.
+#
+# Each member produces its own `agent` span, so a trace shows which one spent
+# the time, and the two task outputs are visibly different things - which is
+# how you can tell the second one is earning its keep.
 
 
 def _concierge() -> Agent:
-    """Gathers the facts. Its backstory is the platform-hosted agent's system
-    prompt, unedited, so both agents are held to identical instructions."""
+    """Owns the facts. Holds the tools; writes for a colleague, not a guest."""
     return Agent(
         role=f"Concierge at {HOTEL_NAME}",
-        goal="Answer the guest's question accurately, grounded in tool data.",
-        backstory=SYSTEM_PROMPT,
+        goal="Establish the facts that answer the guest, using the tools.",
+        backstory=(
+            f"You are the concierge desk at {HOTEL_NAME}. You look things up "
+            "and you are the authority on what is true.\n\n"
+            f"{SYSTEM_PROMPT}\n\n"
+            "On this crew you do not write to the guest. You hand a colleague "
+            "an internal brief: the figures, names and details that answer the "
+            "question, each one taken from a tool result or from the fixed "
+            "answers above. Terse notes, not prose, and no greeting or "
+            "sign-off. If a tool refuses or the data does not cover it, say so "
+            "plainly in the brief so the reply can be honest."
+        ),
         tools=CREW_TOOLS,
         llm=_get_llm(),
         allow_delegation=False,
@@ -133,20 +151,20 @@ def _concierge() -> Agent:
     )
 
 
-def _editor() -> Agent:
-    """Holds the draft to the house voice. No tools, and no licence to invent:
-    everything it is allowed to say is already in front of it."""
+def _writer() -> Agent:
+    """Owns the voice. No tools, so it cannot introduce a fact of its own."""
     return Agent(
-        role="Guest Relations Editor",
-        goal="Make the reply sound like the house, without changing what it says.",
+        role="Guest Relations Writer",
+        goal="Turn the concierge's brief into the reply the guest receives.",
         backstory=(
-            f"You edit outgoing guest correspondence for {HOTEL_NAME}.\n\n"
-            "The standards you enforce are the concierge's own:\n\n"
+            f"You write to guests on behalf of {HOTEL_NAME}. The house "
+            "standards are these:\n\n"
             f"{SYSTEM_PROMPT}\n\n"
-            "You are an editor, not a source. Every fact, figure, room name, "
-            "menu item and recommendation in your version must already appear "
-            "in the draft you were given. Do not add one, remove one, or round "
-            "a price. If the draft is already right, return it unchanged."
+            "You have no tools and no way to look anything up, which is "
+            "deliberate: everything you are allowed to say is in the brief in "
+            "front of you. Do not add a fact, drop one, or round a price. If "
+            "the brief says something could not be found, be honest about it "
+            "and offer the nearest thing that was."
         ),
         tools=[],
         llm=_get_llm(),
@@ -216,32 +234,33 @@ def chat(req: ChatRequest) -> ChatResponse:
     sid = req.session_id or "_anonymous_"
     history = SESSIONS.get(sid, [])
 
-    concierge, editor = _concierge(), _editor()
+    concierge, writer = _concierge(), _writer()
 
-    answer = Task(
+    brief = Task(
         description=_task_description(history, req.message),
         expected_output=(
-            "A draft reply to the guest, grounded in tool data: every figure "
-            "and name taken from a tool result, nothing invented."
+            "An internal brief: the facts needed to answer, as short notes. "
+            "Every figure and name taken from a tool result. No greeting, no "
+            "sign-off, not addressed to the guest."
         ),
         agent=concierge,
     )
-    polish = Task(
+    reply = Task(
         description=(
-            "Edit the concierge's draft into the reply the guest receives. "
-            "Keep every fact exactly as it stands."
+            "Write the reply the guest receives, using only the concierge's "
+            "brief."
         ),
         expected_output=(
             "The final reply: prose, in character, leading with the answer. "
             "No JSON, no preamble, no restating the question."
         ),
-        agent=editor,
-        context=[answer],
+        agent=writer,
+        context=[brief],
     )
 
     crew = Crew(
-        agents=[concierge, editor],
-        tasks=[answer, polish],
+        agents=[concierge, writer],
+        tasks=[brief, reply],
         process=Process.sequential,
         verbose=bool(os.environ.get("CREW_VERBOSE")),
     )

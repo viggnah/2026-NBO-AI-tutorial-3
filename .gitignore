@@ -15,3 +15,5 @@ openai_key.txt
 .DS_Store
 
 04-*/docs
+
+.run.pid

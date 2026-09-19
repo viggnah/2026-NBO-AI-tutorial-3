@@ -3,9 +3,8 @@
 **Duration:** 20 min
 
 Modules 01 through 03 all rested on one assumption: Agent Manager built the
-agent, so Agent Manager could instrument it. That assumption is the
-exception in a real estate, not the rule. Most agents an organisation ends
-up governing were written by another team, on another framework, running in
+agent, so Agent Manager could instrument it. Some agents an organisation ends
+up governing are written by another team, on another framework, running in
 another account - and some of them belong to a vendor.
 
 This module takes an agent the platform has never seen, and gets back the
@@ -50,21 +49,32 @@ The platform-hosted agent is a single tool-calling loop. This one is a crew of
 two, because that is what CrewAI is for and because a real external agent is
 rarely a clone of yours:
 
-| Member | Tools | Does |
-|---|---|---|
-| **Concierge at The Grand Meridian** | all three | gathers the facts and drafts a reply |
-| **Guest Relations Editor** | none | rewrites the draft in the house voice, changing no figure |
+| Member | Tools | Owns | Produces |
+|---|---|---|---|
+| **Concierge at The Grand Meridian** | all three | what is true | an internal brief of facts |
+| **Guest Relations Writer** | none | what the guest reads | the reply |
 
-Both members are given the *same* `agent/system_prompt.py` as their standard,
-so the house style is still defined in one place. The editor is told, on top of
-that, that it is an editor and not a source: every fact in its version must
-already be in the draft it was handed.
+Both are given the *same* `agent/system_prompt.py` as their standard, so the
+house style is defined in one place. What differs is the job: the concierge
+looks things up and writes terse notes for a colleague, and the writer - which
+has no tools and therefore no way to invent a price - turns those notes into
+prose.
+
+**The division has to be real, and it is worth knowing how we found out.** An
+earlier version of this crew gave both members the whole prompt and asked the
+second to "polish" the first's draft. Measured across five prompts, its output
+was **byte-identical every time**, for a third of the latency and a third of
+the tokens. That is the failure mode of multi-agent design: two agents doing
+one job, which is not a system, just a bill. Splitting the responsibility
+instead of duplicating it took the same five prompts to 25-72% similarity
+between brief and reply, and the total request got *faster*, because the
+concierge no longer writes prose nobody reads.
 
 This matters in two places later. In the trace, each member gets its own
 `agent` span, so you can see which one spent the time and which one wrote the
-words the guest actually read. In evaluation, the editor creates something
-module 03 could only describe in the abstract - an intermediate model call the
-guest never sees, which an LLM-level evaluator scores anyway.
+words the guest actually read. In evaluation, the brief is something module 03
+could only describe in the abstract - an intermediate model call the guest
+never sees, which an LLM-level evaluator scores anyway.
 
 ## Why it does not need to be reachable
 
@@ -262,16 +272,16 @@ Open the comparison request. A crew is not a graph, so the tree is shaped
 differently from module 02's - and both crew members are visible in it:
 
 ```
-crewai.workflow                                              4130ms
-  The guest says: "Compare a junior suite and the pres...    2850ms
-    Concierge at The Grand Meridian.agent                    2849ms
-      openai.chat                                            1464ms
-      openai.chat                                            1354ms
+crewai.workflow                                              2942ms
+  The guest says: "Compare a junior suite and the pres...    1821ms
+    Concierge at The Grand Meridian.agent                    1820ms
+      openai.chat                                             996ms
+      openai.chat                                             810ms
       execute_tool check_room_availability                       0ms
       execute_tool check_room_availability                       0ms
-  Edit the concierge's draft into the reply the guest...     1226ms
-    Guest Relations Editor.agent                             1225ms
-      openai.chat                                            1211ms
+  Write the reply the guest receives, using only the...      1100ms
+    Guest Relations Writer.agent                             1099ms
+      openai.chat                                            1091ms
 ```
 
 Ten spans from **three** sources, which is worth pausing on:
@@ -284,18 +294,18 @@ Ten spans from **three** sources, which is worth pausing on:
 | `openai.chat` | **OpenAI SDK** instrumentation | messages, tokens, finish reason, tool definitions |
 | `execute_tool <name>` | **this repository** | arguments, result, status - see below |
 
-CrewAI's instrumentation never sees the model calls. Those are caught
-separately, because CrewAI's OpenAI provider goes through the OpenAI SDK,
-which is on the catalogue in its own right. Zero-code coverage is the union of
-whichever recognised libraries your agent happens to call - not one framework
-integration - and the last row is what you add when that union has a hole in
-it.
+**Read the per-agent split first.** The concierge took 1.82s and the writer
+1.10s of a 2.94s request: roughly two thirds of the time establishing the
+facts, one third turning them into prose. Nobody instrumented that division -
+it falls out of the crew having two members, and it is the first question to
+ask of any multi-agent system that feels slow.
 
-**Read the per-agent split first.** The concierge took 2.85s and the editor
-1.23s of a 4.13s request: two thirds of the time went to gathering facts, one
-third to writing the sentence the guest read. Nobody instrumented that
-division - it falls out of the crew having two members, and it is the first
-question to ask of any multi-agent system that feels slow.
+It is also how you audit whether a member is worth its place. Open the two
+task spans and read `traceloop.entity.output` on each: one is a brief of
+notes, the other is the guest's reply. When those two are the *same text*, the
+second agent is costing you a third of every request to retype the first
+one's answer - which is exactly what an earlier version of this crew was
+doing, and exactly what the trace made obvious.
 
 Tool spans at 0ms are not a bug either. These tools are dictionary lookups in
 the same process, so they finish inside a millisecond. That is module 02's
