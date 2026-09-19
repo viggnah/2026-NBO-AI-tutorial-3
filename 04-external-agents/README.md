@@ -449,14 +449,43 @@ free, and being straight about the trade is part of presenting it:
 |---|---|---|
 | Build from source | ✅ | you own it |
 | Deploy, promote, roll back, suspend | ✅ | you own it |
-| Gateway, API keys, rate limits in front | ✅ | you own it |
+| **Inbound** gateway, API keys, rate limits | ✅ | you own it |
+| **Outbound** LLM gateway, guardrails, token limits | ✅ | ✅ - you wire it |
 | Restart when it dies | ✅ | you own it |
 | Traces, spans, token accounting | ✅ | ✅ |
 | Evaluation, monitors, custom evaluators | ✅ | ✅ |
 | AgentID credentials per environment | injected | generated, wired by you |
 | `amctl agent logs` / `metrics` / `traces` | ✅ | **refused** |
 
-That last row catches people. The runtime-observability subcommands work
+The two gateway rows are the ones worth reading carefully, because they point
+in opposite directions.
+
+**Inbound**, the platform cannot help. An environment's ingress gateway
+fronts workloads the platform runs, and registering an external agent tells
+it a name and a description - not a hostname. There is nowhere for the
+platform to send traffic, so authenticating and rate-limiting callers stays
+your problem. Put your own gateway in front of it, as you would for any
+service you host.
+
+**Outbound**, it can, and this is the row most people miss. Attach an
+org-level **LLM Service Provider** to this agent under **Configure → Add LLM
+Configuration**, and the console hands back a gateway **Endpoint URL**, a
+header name (`API-Key`) and a key. Point the agent's LLM client at that URL
+instead of the provider's and every model call routes through the platform:
+rate limits, access control and **guardrails** apply centrally, and the real
+provider credential never reaches your agent. Guardrails attach at the
+provider *and* at this agent's binding to it, and the two compose.
+
+For this agent that is configuration, not a rewrite, because it already reads
+`OPENAI_BASE_URL`. The only code it needs is the custom header, since the
+OpenAI SDK sends `Authorization: Bearer` and the gateway wants `API-Key`:
+
+```python
+LLM(model=LLM_MODEL, base_url=OPENAI_BASE_URL, api_key=...,
+    additional_params={"extra_headers": {"API-Key": LLM_GATEWAY_KEY}})
+```
+
+The last row catches people too. The runtime-observability subcommands work
 against platform-managed agents only and fail up front with an explicit
 error for an external one. The traces exist and the console shows them -
 it is the CLI's runtime commands that do not apply, because there is no
