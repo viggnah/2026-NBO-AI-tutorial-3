@@ -457,10 +457,6 @@ the same dashboard, as the agent the platform operates.
 > to read.
 
 ## Step 8 - What you give up
-
-Registering an external agent is not a way to get platform hosting for
-free, and being straight about the trade is part of presenting it:
-
 | | Platform-Hosted | Externally-Hosted |
 |---|---|---|
 | Build from source | ✅ | you own it |
@@ -471,7 +467,7 @@ free, and being straight about the trade is part of presenting it:
 | Traces, spans, token accounting | ✅ | ✅ |
 | Evaluation, monitors, custom evaluators | ✅ | ✅ |
 | AgentID credentials per environment | injected | generated, wired by you |
-| `amctl agent logs` / `metrics` | ✅ | **refused** |
+| `amctl agent logs` / `metrics` | ✅ | not available |
 | `amctl agent traces` / `trace` / `traces export` | ✅ | ✅ |
 
 The two gateway rows are the ones worth reading carefully, because they point
@@ -502,8 +498,7 @@ LLM(model=LLM_MODEL, base_url=OPENAI_BASE_URL, api_key=...,
     additional_params={"extra_headers": {"API-Key": LLM_GATEWAY_KEY}})
 ```
 
-The last two rows are worth testing rather than believing, because the split
-is not where the CLI reference says it is. `logs` and `metrics` do refuse:
+`logs` and `metrics` are not available for externally-hosted agents:
 
 ```bash
 amctl agent logs external-grand-meridian-c --project session-1 --env gvisor --json
@@ -532,9 +527,6 @@ b993548a  10 spans
 against both agents side by side and the boundary explains itself: the
 platform can only tell you about a process it is running, but it can tell you
 about work any agent did.
-
-The shape of the deal: **the platform governs what it does not operate.**
-Observability and evaluation follow the agent's *record*, not its runtime.
 
 ## Step 9 - Govern the model calls, not just the agent
 
@@ -677,8 +669,7 @@ differ most:
 | `amctl login` | **not yet** | ✅ |
 
 Hosted CLI support is on the way; until it lands, treat
-every hosted step as a console step. Nothing in this module needs the CLI
-except step 9, and step 9 does not need a login.
+every hosted step as a console step.
 
 ## Where the lab leaves you
 
@@ -686,7 +677,7 @@ except step 9, and step 9 does not need a login.
 |---|---|---|
 | 00 | A working agent | - |
 | 01 | Somewhere to run it | yes |
-| 02 | A record of what happened inside a request | yes |
+| 02 | A record of what happened inside a request | no - traces are pushed by the agent |
 | 03 | A score for whether it was any good | no - it reads traces |
 | 04 | The same two, plus a governed path to the model, for an agent run elsewhere | **no** |
 

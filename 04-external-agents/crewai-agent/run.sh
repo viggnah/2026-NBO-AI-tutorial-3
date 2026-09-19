@@ -71,7 +71,25 @@ case "${1:-restart}" in
   restart|start)
     [ -f .env ] || { echo "No .env here. Copy .env.example and fill it in." >&2; exit 1; }
     [ -x "$AMP" ] || { echo "No venv yet. Run: python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt" >&2; exit 1; }
-    : "${OPENAI_API_KEY:?OPENAI_API_KEY is not set in .env}"
+    # There are two valid ways to be configured, and gateway mode is the one
+    # where OPENAI_API_KEY is *meant* to be absent - step 9 tells you to
+    # comment it out, because the platform holds the provider credential.
+    if [ -n "${LLM_GATEWAY_API_KEY:-}" ]; then
+      [ -n "${OPENAI_BASE_URL:-}" ] || {
+        echo "LLM_GATEWAY_API_KEY is set but OPENAI_BASE_URL is not." >&2
+        echo "Both come from the console: Configure -> Add LLM Configuration -> Connect to LLM Provider." >&2
+        exit 1; }
+      if [ -n "${OPENAI_API_KEY:-}" ]; then
+        echo "! OPENAI_API_KEY is still set while routing through the gateway. The agent"
+        echo "  ignores it, but it does not need to be there - see step 9.2."
+      fi
+    else
+      [ -n "${OPENAI_API_KEY:-}" ] || {
+        echo "Neither OPENAI_API_KEY nor LLM_GATEWAY_API_KEY is set in .env." >&2
+        echo "Set OPENAI_API_KEY to call the provider directly, or set OPENAI_BASE_URL" >&2
+        echo "and LLM_GATEWAY_API_KEY to route through Agent Manager (step 9)." >&2
+        exit 1; }
+    fi
 
     stop || exit 1
 
