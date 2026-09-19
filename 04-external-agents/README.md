@@ -647,13 +647,13 @@ scoped to `POST /chat/completions`:
 > nothing. There is no built-in card detector - `email`, `phone` and `ssn` are
 > the only built-ins, so a card needs a custom entity.
 
-**Agent level - block promises the hotel cannot make.** The agent's LLM
-configuration -> **Add Guardrail** -> **Regex Guardrail**, **Response** phase:
+**Agent level - block the words the hotel cannot say.** The agent's LLM
+configuration -> **Add Guardrail** -> **Regex Guardrail**, **Request** phase:
 
 | Field | Value |
 |---|---|
 | regex | `(?i)(guarantee\|refund\|free upgrade)` |
-| jsonPath | `$.choices[0].message.content` |
+| jsonPath | `$.messages[-1].content` |
 | invert | `true` |
 | showAssessment | `true` |
 
@@ -667,21 +667,24 @@ it in the path.
 > pattern does **not** match, which on a first test looks like the guardrail
 > working.
 
-> **Guardrails fail closed, so a misconfigured one is an outage.** Putting
-> that response rule on the **request** phase leaves its JSONPath pointing at
-> `$.choices[...]`, which does not exist in a request. Extraction errors, the
+> **Guardrails fail closed, so a misconfigured one is an outage.** Point a
+> rule at a JSONPath the payload does not have and extraction errors, the
 > policy refuses, and every call fails:
 >
 > ```
 > "actionReason":"Error extracting value from JSONPath","direction":"REQUEST"
 > ```
 >
-> The agent reports only that it cannot reach its systems. Scope the rule to
-> `/chat/completions` too, so it never sees a response it cannot parse.
+> The agent reports only that it cannot reach its systems, because from where
+> it sits that is all it knows. Check a rule against real traffic - including
+> a question that uses a tool - before you rely on it.
+
+This rule sits on the **request** phase, so it reads the guest's message.
+`$.messages[-1].content` is the last thing the guest said.
 
 ### Step 9.5 - Watch them work
 
-The response guardrail is visible from the chat. Ask for something the hotel
+The regex guardrail is visible from the chat. Ask for something the hotel
 cannot promise:
 
 ```bash
@@ -695,7 +698,7 @@ curl -s -X POST localhost:8000/chat -H 'Content-Type: application/json' \
   "response": "I am not able to put that in writing. Let me connect you with our duty manager, who can help.",
   "policy": {
     "guardrail": "regex-guardrail",
-    "direction": "RESPONSE",
+    "direction": "REQUEST",
     "assessment": "Violated regular expression: (?i)(guarantee|refund|free upgrade)"
   }
 }
@@ -713,22 +716,36 @@ configured.
 **PII masking cannot be shown from the chat**, and the reason is worth saying
 out loud rather than working around. The gateway rewrites the request on its
 way *to* the model; the agent sent the original and never sees the
-substitution. Nothing comes back for it to report. Ask the model directly
-instead:
+substitution. Nothing comes back for it to report.
+
+Ask the model directly instead. The trick is to give it a formatting job
+rather than a question about personal data - asked the second way it gets
+protective and substitutes its own placeholder, which proves nothing:
 
 ```bash
-curl -s -X POST "$OPENAI_BASE_URL/chat/completions" -H "API-Key: $LLM_GATEWAY_API_KEY" \
-  -H 'Content-Type: application/json' -d '{"model":"...","messages":[{"role":"user",
-  "content":"Booking ref 4111 1111 1111 1111. Quote the exact characters between ref and the end."}]}' \
+curl -s -X POST "$OPENAI_BASE_URL/chat/completions" \
+  -H "API-Key: $LLM_GATEWAY_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":
+  "Reformat this reservation record as a markdown bullet list. Copy every value exactly as written; do not alter, summarise or omit anything.\nguest=A. Osei; contact=guest@example.com; card=4111 1111 1111 1111; room=Junior Suite; rate=380; nights=3; total=1140; arrival=2026-06-05"}]}' \
   | jq -r '.choices[0].message.content'
 ```
 
 ```
-*****
+- guest=A. Osei
+- *****
+- card=*****
+- room=Junior Suite
+- rate=380
+- nights=3
+- total=1140
+- arrival=2026-06-05
 ```
 
-The card never reached OpenAI. That is the whole claim, and it is one line of
-output.
+That is the whole claim in one block. The card and the email never reached
+OpenAI - and the six fields beside them arrived untouched, which is the part
+worth pointing at. This is not the model refusing to repeat something
+sensitive; it is the model faithfully copying what it was given, having been
+given asterisks.
 
 > **Give the gateway a moment after any policy change.** The proxy
 > redeploys, and the first call after an edit returns `504 upstream request
