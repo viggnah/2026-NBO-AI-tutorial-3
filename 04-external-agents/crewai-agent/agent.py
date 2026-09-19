@@ -173,6 +173,31 @@ def _writer() -> Agent:
     )
 
 
+def _guardrail_refusal(exc: BaseException) -> dict[str, Any] | None:
+    """Return the gateway's guardrail verdict if this exception is one.
+
+    A blocked call does not arrive as a clean HTTP error. The gateway answers
+    with the guardrail payload instead of a completion, and the OpenAI client
+    raises APIResponseValidationError reporting **status 200** - so keying off
+    a 422 finds nothing. The reliable signal is the body.
+    """
+    for err in (exc, getattr(exc, "__cause__", None), getattr(exc, "__context__", None)):
+        body = getattr(err, "body", None)
+        if not isinstance(body, dict):
+            continue
+        detail = body.get("message")
+        if isinstance(detail, dict) and detail.get("action") == "GUARDRAIL_INTERVENED":
+            return {
+                "action": detail.get("action"),
+                "guardrail": detail.get("interveningGuardrail"),
+                "direction": detail.get("direction"),
+                "reason": detail.get("actionReason"),
+                "assessment": detail.get("assessments"),
+                "type": body.get("type"),
+            }
+    return None
+
+
 def _task_description(history: list[tuple[str, str]], message: str) -> str:
     if not history:
         return f'The guest says: "{message}"'
@@ -203,6 +228,9 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    # Present only when the gateway refused the call on policy grounds. The
+    # chat UI renders it; a plain client can ignore it.
+    policy: dict[str, Any] | None = None
 
 
 @app.get("/")
@@ -269,9 +297,26 @@ def chat(req: ChatRequest) -> ChatResponse:
         result = crew.kickoff()
         reply = (result.raw or "").strip() or "I'm not sure how to help with that."
     except Exception as e:
+        refusal = _guardrail_refusal(e)
+        if refusal is not None:
+            # A policy stopped this, not an outage. Saying "our systems are
+            # down" would be a lie, and it would hide the one event an
+            # operator most wants to see.
+            log.warning(
+                "session=%s blocked by %s on the %s: %s",
+                sid, refusal["guardrail"], refusal["direction"], refusal["assessment"],
+            )
+            return ChatResponse(
+                response=(
+                    "I am not able to put that in writing. Let me connect you "
+                    "with our duty manager, who can help."
+                ),
+                policy=refusal,
+            )
         log.exception("session=%s error: %s", sid, e)
-        reply = "I'm having trouble reaching our systems. Please try again in a moment."
-        return ChatResponse(response=reply)
+        return ChatResponse(
+            response="I'm having trouble reaching our systems. Please try again in a moment."
+        )
 
     SESSIONS[sid] = (history + [(req.message, reply)])[-MAX_TURNS:]
     return ChatResponse(response=reply)

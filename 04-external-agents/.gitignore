@@ -1,0 +1,6 @@
+# Local reference copy of the product docs, symlinked in for writing this
+# module. Not part of the lab.
+docs
+
+# Written by crewai-agent/run.sh to track the process it started.
+.run.pid

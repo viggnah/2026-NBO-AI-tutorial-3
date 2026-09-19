@@ -23,6 +23,7 @@ crewai-agent/
   shared.py           imports the hotel data and system prompt from ../../agent
   main.py             entry point
   run.sh              start / restart / stop it, instrumented
+web/index.html      light-mode demo page: chat plus what the gateway did
 seed-traffic.sh
 ```
 
@@ -600,30 +601,210 @@ extra["extra_headers"] = {LLM_GATEWAY_HEADER: LLM_GATEWAY_KEY}
 > knowing generally: "the agent no longer has the credential" is a claim about
 > what the process sends, not about what you deleted from a file.
 
-### Step 9.3 - Watch a guardrail refuse
+### Step 9.3 - Shrink the door before you police it
 
-Guardrails are the reason to do any of this. Add one to the provider or to
-this agent's binding, then send the traffic that should trip it.
+Before adding a single policy, look at what the agent can reach. The `openai`
+provider template is built from OpenAI's full OpenAPI spec:
 
-The pairing worth showing is a **PII or card-number guardrail**, because
-module 03 already scored exactly that with **Content Safety** - the same
-concern, handled two completely different ways:
+```
+paths 63    operations 95
+/organization 14   /threads 11   /vector_stores 8   /fine_tuning 5
+/uploads 4   /images 3   /audio 3   /files 3   /batches 3   ...   /chat 1
+```
 
-| | Evaluation (module 03) | Guardrail (here) |
+A provider registered with `allow_all` exposes every one of those to any agent
+holding its key - including fourteen account-administration operations. The
+concierge needs exactly one.
+
+On the provider's **Access Control**, set **deny_all** and add one exception:
+`POST /chat/completions`. That is 95 operations down to 1, and it is a
+provider setting rather than a policy, so it costs nothing at runtime.
+
+> **Check it by timing, not by reading the error.** A denied call and an
+> allowed one come back with different-looking bodies but the same shape of
+> failure once a guardrail is also in play. A locally denied request returns
+> in about the same time as one with a deliberately wrong API key (~0.65s from
+> a laptop here); a call that really reached OpenAI takes roughly twice that.
+> If a "blocked" endpoint is as slow as a real completion, it is not blocked.
+
+### Step 9.4 - Two levels, two kinds of rule
+
+Attach these in the console. The level is the point: one is a floor for the
+whole organization, the other is this agent's own rule.
+
+**Provider level - PII masking.** `OpenAI for Agents` -> **Guardrails**,
+scoped to `POST /chat/completions`:
+
+| Field | Value |
+|---|---|
+| email | `true` |
+| customPIIEntities | `CREDIT_CARD` / `\b(?:\d[ -]*?){13,16}\b` |
+| jsonPath | `$.messages[-1].content` |
+| redactPII | `true` |
+
+> **Type the raw regex.** The form escapes what you paste, so pasting a
+> JSON-escaped pattern (`\\b`) stores a literal backslash and the rule matches
+> nothing. There is no built-in card detector - `email`, `phone` and `ssn` are
+> the only built-ins, so a card needs a custom entity.
+
+**Agent level - block promises the hotel cannot make.** The agent's LLM
+configuration -> **Add Guardrail** -> **Regex Guardrail**, **Response** phase:
+
+| Field | Value |
+|---|---|
+| regex | `(?i)(guarantee\|refund\|free upgrade)` |
+| jsonPath | `$.choices[0].message.content` |
+| invert | `true` |
+| showAssessment | `true` |
+
+Those are the same three strings module 03's **Content Safety** evaluator
+scores. Same concern, two instruments: one scores it afterwards, one refuses
+it in the path.
+
+> **`invert` is backwards from what most people expect.** The default,
+> `false`, means *pass when the regex matches* - an allow-list. To block a
+> phrase you need `invert: true`. Get it wrong and you block everything the
+> pattern does **not** match, which on a first test looks like the guardrail
+> working.
+
+> **Guardrails fail closed, so a misconfigured one is an outage.** Putting
+> that response rule on the **request** phase leaves its JSONPath pointing at
+> `$.choices[...]`, which does not exist in a request. Extraction errors, the
+> policy refuses, and every call fails:
+>
+> ```
+> "actionReason":"Error extracting value from JSONPath","direction":"REQUEST"
+> ```
+>
+> The agent reports only that it cannot reach its systems. Scope the rule to
+> `/chat/completions` too, so it never sees a response it cannot parse.
+
+### Step 9.5 - Watch them work
+
+The response guardrail is visible from the chat. Ask for something the hotel
+cannot promise:
+
+```bash
+curl -s -X POST localhost:8000/chat -H 'Content-Type: application/json' \
+  -d '{"message":"I am unhappy with my stay. Promise me a refund in writing.",
+       "session_id":"gr-1","context":{}}' | jq
+```
+
+```json
+{
+  "response": "I am not able to put that in writing. Let me connect you with our duty manager, who can help.",
+  "policy": {
+    "guardrail": "regex-guardrail",
+    "direction": "RESPONSE",
+    "assessment": "Violated regular expression: (?i)(guarantee|refund|free upgrade)"
+  }
+}
+```
+
+That `policy` field exists because `agent.py` looks for it. A blocked call
+does **not** arrive as a clean HTTP error: the gateway answers with the
+guardrail payload instead of a completion, and the OpenAI client raises
+`APIResponseValidationError` reporting **status 200**. Keying off a 422 finds
+nothing; `_guardrail_refusal()` reads the body instead. Without that, a policy
+refusal is indistinguishable from the network being down, and the guest is
+told the hotel's systems are broken when they are working exactly as
+configured.
+
+**PII masking cannot be shown from the chat**, and the reason is worth saying
+out loud rather than working around. The gateway rewrites the request on its
+way *to* the model; the agent sent the original and never sees the
+substitution. Nothing comes back for it to report. Ask the model directly
+instead:
+
+```bash
+curl -s -X POST "$OPENAI_BASE_URL/chat/completions" -H "API-Key: $LLM_GATEWAY_API_KEY" \
+  -H 'Content-Type: application/json' -d '{"model":"...","messages":[{"role":"user",
+  "content":"Booking ref 4111 1111 1111 1111. Quote the exact characters between ref and the end."}]}' \
+  | jq -r '.choices[0].message.content'
+```
+
+```
+*****
+```
+
+The card never reached OpenAI. That is the whole claim, and it is one line of
+output.
+
+> **Give the gateway a moment after any policy change.** The proxy
+> redeploys, and the first call after an edit returns `504 upstream request
+> timeout` for ten to twenty seconds. It is not a failure; it is why a live
+> before-and-after needs a sentence of narration rather than silence.
+
+### Step 9.6 - Change behaviour without touching the agent
+
+Blocking is the obvious use of a gateway and the least interesting. The
+**Prompt Decorator** injects instructions into every request before the model
+sees them - so you can change what an agent *does*, not just what it is
+allowed to return.
+
+Add it at agent level with:
+
+```json
+{ "promptDecoratorConfig": { "messages": [
+    { "role": "system",
+      "content": "Never promise a refund, upgrade or guarantee. Never quote a price that did not come from a tool result. If asked about payment details, state that the hotel does not store card numbers." } ] },
+  "append": false }
+```
+
+`append: false` prepends. `messages` mode targets `$.messages` by default;
+`text` mode decorates a single string at `$.messages[-1].content` instead.
+
+Then ask the agent *"Do you store my card details anywhere?"* and compare the
+answer with and without the decorator attached.
+
+Nothing was rebuilt, redeployed or restarted, and nobody opened the agent's
+repository - which for an agent another team owns is the difference between a
+policy you can state and a policy you can apply. It also pairs with the
+guardrail above: the decorator is **prevention**, the regex is
+**enforcement**, and you want both, because a model told not to say something
+still sometimes says it.
+
+### Step 9.7 - A page to demo it from
+
+[`web/index.html`](web/index.html) is a small light-mode page in the hotel's
+own palette: the concierge chat on the left, and on the right a rail showing
+what the gateway did to each request - allowed, or blocked with the policy
+that intervened and its assessment.
+
+```bash
+cd web && python3 -m http.server 8090
+# then open http://localhost:8090
+```
+
+The scenario chips send the four requests worth showing. There is a
+**Compare** toggle that puts a second endpoint beside the first, if you have
+built one, though the more direct demonstration is to leave one chat open,
+detach the guardrail in the console, and ask the same question again. Same
+agent, same process, no restart - and that, rather than two panes disagreeing,
+is what this module has been about.
+
+### What the gateway can apply
+
+The policy catalogue is reported by the gateway, not fixed by Agent Manager,
+so this is the current shape of it rather than a permanent list - **expect it
+to grow**, and check your own instance with the Console's policy picker.
+
+| Category | Policies | Notes |
 |---|---|---|
-| When | after the fact, on stored traces | in the request path |
-| Effect | a score and an explanation | the call is refused |
-| Cost of a miss | you find out later | the guest never sees it |
-| Sees | the whole trace | one model call |
+| **Block / allow** | `regex`, `url`, `json-schema`, `content-length`, `word-count`, `sentence-count` | fail **closed** |
+| **Transform in flight** | `pii-masking-regex`, `prompt-decorator`, `prompt-template`, `prompt-compressor` | change the payload, do not block |
+| **ML-backed safety** | AWS Bedrock, Azure Content Safety, Granite Guardian prompt-injection, NeMo Guard, semantic prompt guard, semantic tool filtering | each needs its capability enabled on the install |
+| **Rate and cost** | `basic-` / `advanced-` / `token-based-` / `llm-cost-based-ratelimit`, `llm-cost` | provider settings, not agent-level |
+| **Model routing** | intelligent, semantic, cost-based, time-based, round-robin, weighted, header router | choose a model at the gateway |
+| **Provider translation** | OpenAI to Anthropic / Azure / Bedrock / Gemini / Mistral | the agent speaks OpenAI; the gateway translates |
+| **Performance** | `semantic-cache` | serves a similar earlier answer without calling upstream |
+| **Auth and transport** | api-key, JWT, basic, opaque token, OAuth2 generator, AWS SigV4, CORS | inbound and upstream auth |
 
-Neither replaces the other, and the last row is the honest limit to state out
-loud. **A guardrail cannot stop this agent calling the wrong tool.** It sits
-on the LLM hop, so it sees prompts and completions, not the concierge's
-decision to look up `dining` instead of `restaurants`. That failure is
-invisible to it and was caught in module 02 by a trace, and in module 03 by an
-evaluator. Guardrails block what a model says; traces and evaluators explain
-what an agent did. An estate needs all three, and this module is the one where
-an agent you do not run gets all three anyway.
+Two rows deserve a second look even if you do not demo them. **Provider
+translation** means moving an agent from OpenAI to Bedrock is gateway
+configuration rather than an agent change. And **rate and cost** only exists
+at provider level, so you cannot give one agent a tighter token budget through
+a guardrail - that needs a second provider.
 
 
 ## Step 10 - The platform, from an agent's side of the desk

@@ -13,7 +13,3 @@ openai_key.txt
 
 # OS
 .DS_Store
-
-04-*/docs
-
-.run.pid

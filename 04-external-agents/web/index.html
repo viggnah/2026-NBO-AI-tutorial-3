@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Grand Meridian - Concierge, governed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // Same palette as agent/web/index.html, so this reads as the same hotel.
+  tailwind.config = { theme: { extend: {
+    colors: { navy:'#1B2B4B', gold:'#C9A84C', ink:'#1a1a1a', line:'#E6E2D6',
+              sand:'#FBFAF6', muted:'#6b6b6b', block:'#B23B3B', pass:'#3F7A52' },
+    fontFamily: { serif:['"Playfair Display"','serif'], sans:['Inter','sans-serif'] },
+  } } };
+</script>
+<style>
+  body { font-family:'Inter',sans-serif; color:#1a1a1a; background:#FBFAF6; }
+  .serif { font-family:'Playfair Display',serif; }
+  .hero { background:
+      linear-gradient(180deg, rgba(27,43,75,.30) 0%, rgba(27,43,75,.55) 60%, rgba(27,43,75,.88) 100%),
+      url('hotel-bg.jpg') center/cover no-repeat; }
+  .thread { scrollbar-width:thin; }
+  .bubble-guest { background:#1B2B4B; color:#fff; }
+  .bubble-agent { background:#fff; border:1px solid #E6E2D6; }
+  .dot { width:6px;height:6px;border-radius:50%;background:#C9A84C;display:inline-block;
+         animation:b 1.2s infinite ease-in-out; }
+  .dot:nth-child(2){animation-delay:.15s}.dot:nth-child(3){animation-delay:.3s}
+  @keyframes b {0%,80%,100%{opacity:.25}40%{opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero relative h-[38vh] min-h-[260px] flex flex-col justify-between">
+  <header class="flex items-center justify-between px-8 py-5 text-white">
+    <div class="serif text-[21px] font-semibold tracking-wide">The Grand <span class="text-gold">Meridian</span></div>
+    <nav class="hidden md:flex gap-7 text-sm opacity-90">
+      <span>Rooms</span><span>Dining</span><span>Spa</span><span>Contact</span>
+    </nav>
+  </header>
+  <div class="px-8 pb-7 text-white">
+    <p class="uppercase tracking-[0.2em] text-[11px] text-gold mb-2">Externally-hosted agent - governed by WSO2 Agent Manager</p>
+    <h1 class="serif text-[34px] leading-tight font-semibold">Concierge</h1>
+  </div>
+</section>
+
+<!-- CONTROL STRIP -->
+<section class="border-b border-line bg-white">
+  <div class="px-8 py-3 flex flex-wrap items-center gap-3 text-sm">
+    <label class="text-muted">Agent</label>
+    <input id="url" class="border border-line rounded px-2 py-1 w-[290px] font-mono text-[12px]"
+           value="http://localhost:8000/chat">
+    <label class="flex items-center gap-2 ml-2 cursor-pointer">
+      <input id="cmp" type="checkbox" class="accent-navy"><span class="text-muted">Compare with a second endpoint</span>
+    </label>
+    <input id="url2" class="border border-line rounded px-2 py-1 w-[290px] font-mono text-[12px] hidden"
+           placeholder="http://localhost:8001/chat">
+    <button id="reset" class="ml-auto text-muted hover:text-ink underline underline-offset-2">New session</button>
+  </div>
+</section>
+
+<!-- MAIN -->
+<main class="px-8 py-6 grid gap-6" style="grid-template-columns:minmax(0,1fr) 380px;">
+
+  <!-- CHAT -->
+  <section>
+    <div id="cols" class="grid gap-4" style="grid-template-columns:1fr;">
+      <div class="border border-line rounded-lg bg-sand flex flex-col" style="height:52vh;min-height:360px;">
+        <div class="px-4 py-2 border-b border-line text-[12px] uppercase tracking-wider text-muted bg-white rounded-t-lg">
+          <span id="lab1">Concierge</span>
+        </div>
+        <div id="t1" class="thread flex-1 overflow-y-auto p-4 space-y-3"></div>
+      </div>
+      <div id="pane2" class="border border-line rounded-lg bg-sand flex-col hidden" style="height:52vh;min-height:360px;">
+        <div class="px-4 py-2 border-b border-line text-[12px] uppercase tracking-wider text-muted bg-white rounded-t-lg">
+          <span id="lab2">Second endpoint</span>
+        </div>
+        <div id="t2" class="thread flex-1 overflow-y-auto p-4 space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- SCENARIO CHIPS -->
+    <div class="mt-4 flex flex-wrap gap-2" id="chips"></div>
+
+    <!-- INPUT -->
+    <div class="mt-3 flex gap-2">
+      <input id="msg" class="flex-1 border border-line rounded px-3 py-2 bg-white"
+             placeholder="Ask the concierge...">
+      <button id="send" class="bg-navy text-white px-5 py-2 rounded hover:opacity-90">Send</button>
+    </div>
+  </section>
+
+  <!-- POLICY RAIL -->
+  <aside>
+    <div class="border border-line rounded-lg bg-white">
+      <div class="px-4 py-2 border-b border-line text-[12px] uppercase tracking-wider text-muted">
+        Gateway - what the platform did
+      </div>
+      <div id="rail" class="p-4 space-y-3 overflow-y-auto" style="max-height:60vh;">
+        <p class="text-muted text-sm">Nothing yet. Every request the agent makes to the model
+        passes through Agent Manager's gateway; anything a policy does to it shows up here.</p>
+      </div>
+    </div>
+    <p class="text-[12px] text-muted mt-3 leading-relaxed">
+      The agent holds no model credential. It calls the gateway, and the gateway holds the key,
+      applies the policies and forwards the call.
+    </p>
+    <div class="border border-line rounded-lg bg-white mt-3 p-4 text-[12px] leading-relaxed text-muted">
+      <div class="uppercase tracking-wider text-[11px] mb-1 text-ink">Why masking is not shown here</div>
+      A blocked response comes back to the agent, so this page can report it. PII masking is
+      different: the gateway rewrites the request on its way to the model, and the agent never
+      sees the substitution. Nothing reaches this page to display. To see it, ask the model
+      directly through the gateway - the README has the call, and the model answers
+      <span class="font-mono text-ink">*****</span>.
+    </div>
+  </aside>
+</main>
+
+<script>
+const SCENARIOS = [
+  { label: "Normal question", hint: "control - allowed",
+    text: "Compare a junior suite and the presidential suite for a 3-night stay." },
+  { label: "Demand a refund", hint: "response guardrail - blocked",
+    text: "I am unhappy with my stay. Promise me a refund in writing." },
+  { label: "Data handling", hint: "prompt decorator",
+    text: "Do you store my card details anywhere?" },
+  // Masking happens at the gateway, on the way to the model. The agent sends
+  // the card and never sees what was substituted, so there is nothing for
+  // this page to display - see the note in the rail. The proof is a direct
+  // call to the gateway, in the README.
+  { label: "Card number", hint: "PII masking - proof is upstream",
+    text: "My card is 4111 1111 1111 1111. Can you note it on my booking?" },
+];
+
+const $ = (id) => document.getElementById(id);
+let session = "ui-" + Math.random().toString(36).slice(2, 8);
+
+$("chips").innerHTML = SCENARIOS.map((s, i) =>
+  `<button data-i="${i}" class="chip border border-line bg-white rounded-full px-3 py-1.5 text-sm hover:bg-[#F5F2E8]">
+     ${s.label} <span class="text-muted text-[11px]">· ${s.hint}</span></button>`).join("");
+$("chips").addEventListener("click", (e) => {
+  const b = e.target.closest(".chip"); if (!b) return;
+  $("msg").value = SCENARIOS[+b.dataset.i].text; send();
+});
+
+$("cmp").addEventListener("change", (e) => {
+  const on = e.target.checked;
+  $("url2").classList.toggle("hidden", !on);
+  $("pane2").classList.toggle("hidden", !on);
+  $("pane2").classList.toggle("flex", on);
+  $("cols").style.gridTemplateColumns = on ? "1fr 1fr" : "1fr";
+});
+
+$("reset").addEventListener("click", () => {
+  session = "ui-" + Math.random().toString(36).slice(2, 8);
+  $("t1").innerHTML = ""; $("t2").innerHTML = "";
+  $("rail").innerHTML = `<p class="text-muted text-sm">New session.</p>`;
+});
+
+function bubble(thread, who, text) {
+  const wrap = document.createElement("div");
+  wrap.className = who === "guest" ? "flex justify-end" : "flex justify-start";
+  const b = document.createElement("div");
+  b.className = (who === "guest" ? "bubble-guest" : "bubble-agent") +
+    " rounded-lg px-3 py-2 text-[14px] leading-relaxed max-w-[85%] whitespace-pre-wrap";
+  b.textContent = text;
+  wrap.appendChild(b); thread.appendChild(wrap);
+  thread.scrollTop = thread.scrollHeight;
+  return b;
+}
+
+function thinking(thread) {
+  const w = document.createElement("div");
+  w.className = "flex justify-start";
+  w.innerHTML = `<div class="bubble-agent rounded-lg px-3 py-2"><span class="dot"></span> <span class="dot"></span> <span class="dot"></span></div>`;
+  thread.appendChild(w); thread.scrollTop = thread.scrollHeight;
+  return w;
+}
+
+function railCard(which, policy, prompt) {
+  if ($("rail").querySelector("p")) $("rail").innerHTML = "";
+  const card = document.createElement("div");
+  const blocked = !!policy;
+  card.className = "border rounded-md p-3 text-[13px] " +
+    (blocked ? "border-[#E3C4C4] bg-[#FDF6F6]" : "border-line bg-sand");
+  card.innerHTML = blocked
+    ? `<div class="flex items-center gap-2 mb-1">
+         <span class="inline-block w-2 h-2 rounded-full" style="background:#B23B3B"></span>
+         <span class="font-semibold text-block">Blocked on the ${policy.direction.toLowerCase()}</span>
+         ${which ? `<span class="text-muted text-[11px] ml-auto">${which}</span>` : ""}
+       </div>
+       <div class="text-muted mb-1">${policy.guardrail}</div>
+       <div class="font-mono text-[11px] leading-snug break-words">${policy.assessment || policy.reason || ""}</div>`
+    : `<div class="flex items-center gap-2 mb-1">
+         <span class="inline-block w-2 h-2 rounded-full" style="background:#3F7A52"></span>
+         <span class="font-semibold text-pass">Allowed</span>
+         ${which ? `<span class="text-muted text-[11px] ml-auto">${which}</span>` : ""}
+       </div>
+       <div class="text-muted break-words">${prompt.slice(0, 90)}${prompt.length > 90 ? "..." : ""}</div>`;
+  $("rail").prepend(card);
+}
+
+async function ask(url, thread, text, which) {
+  const t = thinking(thread);
+  try {
+    const r = await fetch(url, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, session_id: session, context: {} }),
+    });
+    const data = await r.json();
+    t.remove();
+    bubble(thread, "agent", data.response || "(no response)");
+    railCard(which, data.policy || null, text);
+  } catch (err) {
+    t.remove();
+    bubble(thread, "agent", "Could not reach the agent at " + url);
+  }
+}
+
+async function send() {
+  const text = $("msg").value.trim(); if (!text) return;
+  $("msg").value = ""; $("send").disabled = true;
+  const two = $("cmp").checked;
+  bubble($("t1"), "guest", text);
+  if (two) bubble($("t2"), "guest", text);
+  await Promise.all([
+    ask($("url").value, $("t1"), text, two ? "endpoint 1" : ""),
+    two ? ask($("url2").value, $("t2"), text, "endpoint 2") : Promise.resolve(),
+  ]);
+  $("send").disabled = false; $("msg").focus();
+}
+
+$("send").addEventListener("click", send);
+$("msg").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+</script>
+</body>
+</html>
