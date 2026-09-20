@@ -155,11 +155,12 @@
         </div>
       </div>
       <div class="border border-line rounded-lg bg-white/70 mt-3 p-3.5 text-[12px] leading-relaxed text-muted shrink-0">
-        <div class="uppercase tracking-wider text-[10px] mb-1 text-ink">Why masking is not shown here</div>
-        A blocked response comes back to the agent, so this page can report it. PII masking is
-        different: the gateway rewrites the request on its way to the model, and the agent never
-        sees the substitution. Ask the model directly through the gateway to see it - the README
-        has the call, and the answer is <span class="font-mono text-ink">*****</span>.
+        <div class="uppercase tracking-wider text-[10px] mb-1 text-ink">Why masking rarely shows here</div>
+        Masking happens on the request, so the model is the party that sees asterisks. You only see
+        them if the model repeats them back, and this concierge is told to lead with the answer
+        rather than restate the guest. Run
+        <span class="font-mono text-ink">./gateway-test.sh pii</span> to see it against the model
+        directly, with no persona in the way.
       </div>
     </aside>
   </div>

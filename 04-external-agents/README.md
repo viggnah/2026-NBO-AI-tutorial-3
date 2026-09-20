@@ -286,9 +286,9 @@ crewai.workflow                                              2942ms
   The guest says: "Compare a junior suite and the pres...    1821ms
     Concierge at The Grand Meridian.agent                    1820ms
       openai.chat                                             996ms
+      execute_tool check_room_availability                      0ms
+      execute_tool check_room_availability                      0ms
       openai.chat                                             810ms
-      execute_tool check_room_availability                       0ms
-      execute_tool check_room_availability                       0ms
   Write the reply the guest receives, using only the...      1100ms
     Guest Relations Writer.agent                             1099ms
       openai.chat                                            1091ms
@@ -388,13 +388,6 @@ model reads is untouched:
 def check_room_availability(...)
 ```
 
-There is no exporter setup in that file and no `init_otel()` call. Under
-`amp-instrument` a tracer provider is already installed, so these spans travel
-out with the rest; run the agent bare and `get_tracer` returns a no-op that
-drops them harmlessly. `init_otel()` is for an agent with *no* auto
-instrumentation - calling it here would point a second exporter at spans that
-already have one.
-
 ### The refusal that is now visible
 
 One detail in `instrumentation.py` is worth more than the rest of it. These
@@ -412,18 +405,6 @@ span now carries an error badge and turns up under
 `--condition tool_call_fails`. That is exactly the shape of module 02's
 planted fault - a tool that says no, a `200 OK`, and a polite apology - except
 that here it raises its hand instead of waiting to be found.
-
-The lesson generalises past this lab. **Check the instrumentation catalogue
-against your own framework before assuming coverage**, because the failure
-mode is not an empty trace. It is a trace that looks complete until you go
-looking for the one span you wanted to filter on. And when you find the gap,
-the contract is published: closing it is a decorator, not a project.
-
-> **The task span is named after the task description**, which contains the
-> guest's message - so guest utterances appear as span names in the trace
-> list. Convenient here, worth a thought before pointing this at real
-> traffic.
-
 
 ## Step 7 - Score it with module 03's standards
 
@@ -735,14 +716,25 @@ refusal is indistinguishable from the network being down, and the guest is
 told the hotel's systems are broken when they are working exactly as
 configured.
 
-**PII masking cannot be shown from the chat**, and the reason is worth saying
-out loud rather than working around. The gateway rewrites the request on its
-way *to* the model; the agent sent the original and never sees the
-substitution. Nothing comes back for it to report.
+**PII masking usually will not show up in the chat**, and the reason is about
+this agent rather than about the gateway. The substitution happens on the
+request, on its way to the model, so the model is the only party that sees
+asterisks. Whether *you* see them depends on whether the model repeats the
+masked text back - and this concierge is told to lead with the answer and not
+restate the guest's input, so it does not. Ask it to confirm a card back and
+it declines outright:
 
-Ask the model directly instead. The trick is to give it a formatting job
-rather than a question about personal data - asked the second way it gets
-protective and substitutes its own placeholder, which proves nothing:
+> *"I'm unable to confirm or repeat masked payment details."*
+
+Note the word **masked**: the model is describing what it received. The
+mechanism worked; the reply just never carries it.
+
+So prove it against the model directly, where no persona is in the way.
+[`gateway-test.sh`](crewai-agent/gateway-test.sh) does this and two other
+checks; `./gateway-test.sh pii` runs just this one. The trick is to give the
+model a formatting job rather than a question about personal data - asked the
+second way it gets protective and substitutes its own placeholder, which
+proves nothing:
 
 ```bash
 curl -s -X POST "$OPENAI_BASE_URL/chat/completions" \
@@ -768,6 +760,11 @@ OpenAI - and the six fields beside them arrived untouched, which is the part
 worth pointing at. This is not the model refusing to repeat something
 sensitive; it is the model faithfully copying what it was given, having been
 given asterisks.
+
+> **If you do want it in the chat**, the decorator from step 10.6 is the lever:
+> tell the agent to confirm the guest's details back and the masked values
+> travel out with the reply. Worth knowing that it is the agent's instructions
+> deciding this, not the policy.
 
 > **Give the gateway a moment after any policy change.** The proxy
 > redeploys, and the first call after an edit returns `504 upstream request
