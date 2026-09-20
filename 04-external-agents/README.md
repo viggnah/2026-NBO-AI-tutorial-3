@@ -783,15 +783,19 @@ Add it at agent level with:
 ```json
 { "promptDecoratorConfig": { "messages": [
     { "role": "system",
-      "content": "Never promise a refund, upgrade or guarantee. Never quote a price that did not come from a tool result. If asked about payment details, state that the hotel does not store card numbers." } ] },
+      "content": "Never promise a refund, upgrade or guarantee. Never quote a price that did not come from a tool result." } ] },
   "append": false }
 ```
+
+> Provide **exactly one** of `messages` or `text` - the schema is a `oneOf`.
+> Setting both saves without complaint and the gateway then answers every
+> request with `500`.
 
 `append: false` prepends. `messages` mode targets `$.messages` by default;
 `text` mode decorates a single string at `$.messages[-1].content` instead.
 
-Then ask the agent *"Do you store my card details anywhere?"* and compare the
-answer with and without the decorator attached.
+Then ask the agent for its *"very best nightly rate"* on a suite and compare
+the answer with and without the decorator attached.
 
 Nothing was rebuilt, redeployed or restarted, and nobody opened the agent's
 repository - which for an agent another team owns is the difference between a
