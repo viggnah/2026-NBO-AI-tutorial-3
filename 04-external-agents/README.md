@@ -23,6 +23,7 @@ crewai-agent/
   shared.py           imports the hotel data and system prompt from ../../agent
   main.py             entry point
   run.sh              start / restart / stop it, instrumented
+  gateway-test.sh     talk to the LLM gateway with no agent in the way
 web/index.html      light-mode demo page: chat plus what the gateway did
 seed-traffic.sh
 ```
@@ -147,7 +148,7 @@ rather than harder.
 
 | Field | Value |
 |---|---|
-| Name | `Grand Meridian Concierge External` |
+| Name | `[External] Grand Meridian Concierge` |
 | Description (optional) | `CrewAI concierge, running outside the platform` |
 
 Notice what the form does *not* ask for: no repository, no branch, no
@@ -476,7 +477,7 @@ the provider credential never reaching your agent. That is step 10.
 `logs` and `metrics` are not available for externally-hosted agents:
 
 ```bash
-amctl agent logs external-grand-meridian-c --project session-1 --env gvisor --json
+amctl agent logs external-grand-meridian-c --project session-1 --env default --json
 ```
 ```
 VALIDATION: agent "external-grand-meridian-c" is externally provisioned
@@ -490,7 +491,7 @@ records the agent pushed, and the CLI serves them the same for both kinds of
 agent:
 
 ```bash
-amctl agent traces external-grand-meridian-c --project session-1 --env gvisor --since 12h --json \
+amctl agent traces external-grand-meridian-c --project session-1 --env default --since 12h --json \
   | jq -r '.data.traces[] | "\(.traceId[0:8])  \(.spanCount) spans"'
 ```
 ```
@@ -739,7 +740,7 @@ proves nothing:
 ```bash
 curl -s -X POST "$OPENAI_BASE_URL/chat/completions" \
   -H "API-Key: $LLM_GATEWAY_API_KEY" -H 'Content-Type: application/json' \
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":
+  -d '{"model":"'"$OPENAI_MODEL"'","messages":[{"role":"user","content":
   "Reformat this reservation record as a markdown bullet list. Copy every value exactly as written; do not alter, summarise or omit anything.\nguest=A. Osei; contact=guest@example.com; card=4111 1111 1111 1111; room=Junior Suite; rate=380; nights=3; total=1140; arrival=2026-06-05"}]}' \
   | jq -r '.choices[0].message.content'
 ```
