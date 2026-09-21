@@ -21,10 +21,14 @@
   body { font-family:'Inter',sans-serif; color:#1a1a1a; background:#fff; }
   .serif { font-family:'Playfair Display',serif; }
 
-  /* Local image rather than module 00's Unsplash URLs: a conference network
-     that blocks or throttles a CDN should not cost you the hero shot. */
+  /* Module 00's hero image, with the local copy underneath it. Stacked CSS
+     backgrounds paint top to bottom and a layer that fails to load is simply
+     not painted - so if the CDN is blocked or throttled, which is a fair bet
+     on a conference network, hotel-bg.jpg shows through and nobody notices.
+     It is also what renders first while Unsplash is still arriving. */
   .hero { background:
       linear-gradient(180deg, rgba(27,43,75,.35) 0%, rgba(27,43,75,.45) 50%, rgba(27,43,75,.85) 100%),
+      url('https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=2400&q=80') center/cover no-repeat,
       url('hotel-bg.jpg') center/cover no-repeat; }
 
   /* The backdrop behind the expanded chat. Two faint gold motifs on the sand

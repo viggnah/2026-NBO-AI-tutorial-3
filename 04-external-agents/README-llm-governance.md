@@ -1,6 +1,6 @@
 # Module 04b - LLM Governance: controlling the model call
 
-**Duration:** 20 min
+**Duration:** 12 min
 
 > Continues from [Module 04](README.md). That module ends with an agent the
 > platform observes and scores but does not run. This one puts the platform
