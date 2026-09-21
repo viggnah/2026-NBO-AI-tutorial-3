@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Send the same seven requests module 02 sent to the platform-hosted agent,
-# this time to the CrewAI agent running on your own machine.
+# Send the seven requests module 02 sent to the platform-hosted agent, plus
+# two that go wrong on purpose, to the CrewAI agent running on your machine.
 #
 # The prompts are deliberately identical. Two agents, two frameworks, two
 # places to run, one set of questions - which is what makes the evaluation
@@ -9,6 +9,11 @@
 #
 # Unlike module 02 there is no gateway and no API key: this agent is not
 # behind Agent Manager's ingress, you are calling it directly.
+#
+# The last two are the error shapes. One asks for a stay longer than the tool
+# accepts, so the tool returns {"error": ...} rather than raising: the span
+# carries an error status and --condition tool_call_fails will find it. The
+# other is out of scope entirely, answered without a tool at all.
 #
 # Usage:
 #   ./seed-traffic.sh                    # defaults to http://localhost:8000
@@ -43,27 +48,33 @@ ask() {
   printf '%s\n' "${text:0:240}"
 }
 
-ask "1/7  no tool call"        "ext-1" \
+ask "1/9  no tool call"        "ext-1" \
     "What are the pool hours?"
 
-ask "2/7  one tool call"       "ext-2" \
+ask "2/9  one tool call"       "ext-2" \
     "Is the honeymoon suite available the first weekend in June?"
 
-ask "3/7  same tool twice"     "ext-3" \
+ask "3/9  same tool twice"     "ext-3" \
     "Compare a junior suite and the presidential suite for a 3-night stay."
 
-ask "4/7  a different tool"    "ext-4" \
+ask "4/9  a different tool"    "ext-4" \
     "What is on the room service menu for vegetarians?"
 
-ask "5/7  two different tools" "ext-5" \
+ask "5/9  two different tools" "ext-5" \
     "We are staying in tonight - what can we order to the room, and what is worth doing nearby tomorrow outdoors?"
 
-ask "6/7  multi-turn"          "ext-6" \
+ask "6/9  multi-turn"          "ext-6" \
     "What does a deluxe room cost?"
 
-ask "7/7  multi-turn"          "ext-6" \
+ask "7/9  multi-turn"          "ext-6" \
     "And for four nights?"
 
-printf '\n\033[1mDone.\033[0m Seven requests across six sessions.\n'
+ask "8/9  a tool that refuses"  "ext-7" \
+    "We would like the deluxe suite for 60 nights please - what is the total?"
+
+ask "9/9  out of scope"         "ext-8" \
+    "Can you book me a taxi to the airport and tell me tomorrow's weather?"
+
+printf '\n\033[1mDone.\033[0m Nine requests across eight sessions.\n'
 printf 'Traces are batched, so give them a few seconds, then open the agent\n'
 printf 'in the console and look at OBSERVABILITY -> Traces.\n\n'

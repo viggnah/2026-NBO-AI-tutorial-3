@@ -5,5 +5,9 @@ docs
 # Written by crewai-agent/run.sh to track the process it started.
 .run.pid
 
-# Local .env backups, e.g. one per registered agent. They hold live keys.
-.env.*.backup
+# Every .env variant holds live keys - backups, one-per-agent copies, the
+# .env.old you leave behind while switching. Ignore them all and keep the
+# single tracked exception explicit.
+.env
+.env.*
+!.env.example

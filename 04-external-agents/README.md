@@ -167,7 +167,7 @@ The console is worth doing once, to see what the form does and does not ask
 for. After that it is a task to hand over. With the `manage-agent` skill
 installed (step 9), the whole of the above is a sentence:
 
-> *"I have an external agent here in this folder, please register it with the agent manager in the TestSession1 project with name `[External] Grand Meridian Concierge`, add the env variables to the .env file after commenting out the existing two and restart using the run.sh script. Then make some calls and verify that traces are flowing through."*
+> *"I have an external agent here in this folder, please register it with the agent manager in the 'External Agent Project' project with name `[External] Grand Meridian Concierge Auto`, add the env variables to the .env file after commenting out the existing two and restart using the run.sh script. Then make some calls and verify that traces are flowing through."*
 
 The assistant runs `amctl agent create --provisioning external`, reads back
 the identifier the platform derived, mints the key, writes both values into
@@ -265,10 +265,17 @@ Traceloop exporting traces to https://...  authenticating with custom headers
 ./seed-traffic.sh
 ```
 
-Seven requests across six sessions - **the same seven prompts module 02
-sent to the platform-hosted agent.** They are identical on purpose. Two
-agents, two frameworks, two places to run, one set of questions makes step
-7 a comparison rather than an anecdote.
+Nine requests across eight sessions. The first seven are **the same prompts
+module 02 sent to the platform-hosted agent**, identical on purpose: two
+agents, two frameworks, two places to run, one set of questions makes step 7
+a comparison rather than an anecdote.
+
+The last two go wrong deliberately, because a seed of nothing but happy paths
+teaches you nothing about reading traces. One asks for a sixty-night stay,
+which is longer than `check_room_availability` accepts, so the tool returns
+`{"error": ...}` rather than raising - the failure module 02 warned about,
+where every status code is still 200. The other is out of scope entirely and
+is answered without a tool at all.
 
 No `AGENT_KEY` this time. There is no gateway in front of this agent, so
 you are calling it directly.
@@ -403,11 +410,31 @@ if isinstance(parsed, dict) and "error" in parsed:
     span.set_attribute("error.type", "ToolRefused")
 ```
 
-Ask this agent for a room type that does not exist and the tool refuses; the
-span now carries an error badge and turns up under
-`--condition tool_call_fails`. That is exactly the shape of module 02's
-planted fault - a tool that says no, a `200 OK`, and a polite apology - except
-that here it raises its hand instead of waiting to be found.
+Request 8 of the seed is exactly that, and it is findable:
+
+```bash
+amctl agent traces <agent> --project <p> --env default \
+  --since 20m --condition tool_call_fails --json
+```
+```
+found: 1
+  26502348  9 spans
+```
+
+The tool span in it carries the whole story:
+
+```
+gen_ai.tool.name         check_room_availability
+error.type               ToolRefused
+traceloop.entity.input   {"room_type": "deluxe", "check_in": null, "nights": 60}
+traceloop.entity.output  {"error": "Nights must be an integer between 1 and 30."}
+status                   error
+```
+
+That is exactly the shape of module 02's planted fault - a tool that says no,
+a `200 OK` to the guest, and a polite apology - except that here it raises its
+hand instead of waiting to be found. One of nine requests failed, nothing in
+the HTTP status said so, and one condition flag picked it out.
 
 ## Step 7 - Score it with module 03's standards
 
