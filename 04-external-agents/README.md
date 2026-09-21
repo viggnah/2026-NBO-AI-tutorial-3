@@ -164,14 +164,13 @@ The console is worth doing once, to see what the form does and does not ask
 for. After that it is a task to hand over. With the `manage-agent` skill
 installed (step 9), the whole of the above is a sentence:
 
-> *"Register an externally-hosted agent called `[External] Grand Meridian
-> Concierge 2` in the `TestSession1` project, then generate an API key for
-> the default environment."*
+> *"I have an external agent here in this folder, please register it with the agent manager in the TestSession1 project with name `[External] Grand Meridian Concierge`, add the env variables to the .env file after commenting out the existing two and restart using the run.sh script. Then make some calls and verify that traces are flowing through."*
 
 The assistant runs `amctl agent create --provisioning external`, reads back
-the identifier the platform derived, and mints the key. What it cannot do is
-paste that key into your `.env` and restart the process - the key is shown
-once, and it is yours to place.
+the identifier the platform derived, mints the key, writes both values into
+`.env`, restarts through `run.sh` and sends traffic until traces appear. The
+key is shown once, so watch that it is captured on the first pass - there is
+no second chance to read it, only a second key.
 
 This is the same claim the module makes about agents, pointed inward: the
 platform is drivable by software, not only by a person with a browser open.
