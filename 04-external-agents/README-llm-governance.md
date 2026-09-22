@@ -202,7 +202,7 @@ Note the word **masked**: the model is describing what it received. The
 mechanism worked; the reply just never carries it.
 
 So prove it against the model directly, where no persona is in the way.
-[`gateway-test.sh`](crewai-agent/gateway-test.sh) does this and two other
+[`gateway-test.sh`](gateway-test.sh) does this and two other
 checks; `./gateway-test.sh pii` runs just this one. The trick is to give the
 model a formatting job rather than a question about personal data - asked the
 second way it gets protective and substitutes its own placeholder, which

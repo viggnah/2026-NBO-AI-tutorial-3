@@ -23,8 +23,8 @@ crewai-agent/
   shared.py           imports the hotel data and system prompt from ../../agent
   main.py             entry point
   run.sh              start / restart / stop it, instrumented
-  gateway-test.sh     talk to the LLM gateway with no agent in the way
 web/index.html      light-mode demo page: chat plus what the gateway did
+gateway-test.sh     talk to the LLM gateway with no agent in the way
 seed-traffic.sh
 ```
 
